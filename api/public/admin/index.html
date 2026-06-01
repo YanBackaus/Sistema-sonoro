@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel D1 mini Scheduler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">D1 mini scheduler</p>
+        <h1>Gerencie horarios sonoros sem depender de Postman</h1>
+        <p class="hero-text">
+          Cadastre devices, registre novos horarios, edite o que mudou, ative ou
+          desative quando precisar e apague o que nao faz mais sentido, tudo em um
+          painel simples ligado direto na API da agenda sonora.
+        </p>
+      </div>
+
+      <div class="hero-panel surface">
+        <div class="status-row">
+          <span class="badge" id="apiBadge">API: aguardando</span>
+          <span class="badge badge-muted" id="browserBadge">Navegador: online</span>
+        </div>
+
+        <label class="field">
+          <span>API Base URL</span>
+          <input
+            id="apiBaseUrlInput"
+            type="text"
+            placeholder="http://localhost:3000"
+            autocomplete="off"
+          >
+        </label>
+
+        <label class="field">
+          <span>API Key</span>
+          <input
+            id="apiKeyInput"
+            type="password"
+            placeholder="Digite a mesma chave da .env"
+            autocomplete="off"
+          >
+        </label>
+
+        <div class="inline-actions">
+          <button id="connectButton" type="button">Conectar</button>
+          <button id="refreshButton" type="button" class="button-secondary">Atualizar</button>
+        </div>
+
+        <p class="hint" id="configHint">
+          Abra este painel em <code>/admin</code>, informe a chave da API e gerencie os horarios
+          dos D1 mini pela mesma rede.
+        </p>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="two-up">
+        <article class="surface panel-card reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Dispositivos</p>
+              <h2>Selecionar e cadastrar</h2>
+            </div>
+            <span class="live-dot-wrap">
+              <span class="live-dot"></span>
+              <span id="deviceStatusText">Sem conexao ainda</span>
+            </span>
+          </div>
+
+          <label class="field">
+            <span>Device atual</span>
+            <select id="deviceSelect">
+              <option value="">Conecte para carregar</option>
+            </select>
+          </label>
+
+          <form id="deviceForm" class="stack-form">
+            <div class="field-grid">
+              <label class="field">
+                <span>Device ID</span>
+                <input id="deviceIdInput" type="text" placeholder="d1mini_02" autocomplete="off" required>
+              </label>
+
+              <label class="field">
+                <span>Nome visivel</span>
+                <input id="deviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
+              </label>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>Local</span>
+                <input id="deviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
+              </label>
+
+              <label class="field">
+                <span>Titulo do menu</span>
+                <input id="deviceMenuTitleInput" type="text" placeholder="Corredor" autocomplete="off">
+              </label>
+            </div>
+
+            <button type="submit">Salvar device</button>
+          </form>
+        </article>
+
+        <article class="surface panel-card reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Resumo</p>
+              <h2>Estado do device</h2>
+            </div>
+          </div>
+
+          <dl class="summary-list">
+            <div>
+              <dt>Nome</dt>
+              <dd id="summaryName">--</dd>
+            </div>
+            <div>
+              <dt>Local</dt>
+              <dd id="summaryLocation">--</dd>
+            </div>
+            <div>
+              <dt>Ultimo heartbeat</dt>
+              <dd id="summaryLastSeen">--</dd>
+            </div>
+            <div>
+              <dt>Horarios ativos</dt>
+              <dd id="summaryActiveSchedules">--</dd>
+            </div>
+            <div>
+              <dt>Som global</dt>
+              <dd id="summarySoundEnabled">--</dd>
+            </div>
+            <div>
+              <dt>Som local</dt>
+              <dd id="summaryLocalSound">--</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="surface panel-card reveal">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker" id="scheduleFormKicker">Novo horario</p>
+            <h2 id="scheduleFormTitle">Cadastro rapido</h2>
+          </div>
+          <span class="editor-badge" id="scheduleEditorBadge" hidden>Criando</span>
+        </div>
+
+        <form id="scheduleForm" class="stack-form">
+          <div class="field-grid field-grid-wide">
+            <label class="field">
+              <span>Descricao</span>
+              <input id="scheduleLabelInput" type="text" placeholder="Entrada" autocomplete="off" required>
+            </label>
+
+            <label class="field">
+              <span>Hora</span>
+              <input id="scheduleHourInput" type="number" min="0" max="23" value="8" required>
+            </label>
+
+            <label class="field">
+              <span>Minuto</span>
+              <input id="scheduleMinuteInput" type="number" min="0" max="59" value="0" required>
+            </label>
+          </div>
+
+          <div class="field">
+            <span>Dias da semana</span>
+            <div class="day-grid" id="dayGrid">
+              <label class="day-chip"><input type="checkbox" value="0"><span>Dom</span></label>
+              <label class="day-chip"><input type="checkbox" value="1" checked><span>Seg</span></label>
+              <label class="day-chip"><input type="checkbox" value="2" checked><span>Ter</span></label>
+              <label class="day-chip"><input type="checkbox" value="3" checked><span>Qua</span></label>
+              <label class="day-chip"><input type="checkbox" value="4" checked><span>Qui</span></label>
+              <label class="day-chip"><input type="checkbox" value="5" checked><span>Sex</span></label>
+              <label class="day-chip"><input type="checkbox" value="6"><span>Sab</span></label>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Frequencia (Hz)</span>
+              <input id="toneHzInput" type="number" min="100" max="6000" value="2400" required>
+            </label>
+
+            <label class="field">
+              <span>Duracao (ms)</span>
+              <input id="toneMsInput" type="number" min="50" max="10000" value="600" required>
+            </label>
+
+            <label class="field">
+              <span>Repeticoes</span>
+              <input id="repeatCountInput" type="number" min="1" max="10" value="1" required>
+            </label>
+
+            <label class="field">
+              <span>Intervalo (ms)</span>
+              <input id="repeatGapInput" type="number" min="0" max="10000" value="250" required>
+            </label>
+          </div>
+
+          <label class="toggle">
+            <input id="enabledInput" type="checkbox" checked>
+            <span>Horario ativo</span>
+          </label>
+
+          <div class="inline-actions">
+            <button id="saveScheduleButton" type="submit">Cadastrar horario</button>
+            <button id="resetScheduleButton" type="button" class="button-secondary">Limpar</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="surface history-panel reveal">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Horarios atuais</p>
+            <h2>Lista do device selecionado</h2>
+          </div>
+          <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
+        </div>
+
+        <div id="flashMessage" class="flash-message" hidden></div>
+        <div class="history-list" id="scheduleList">
+          <div class="empty-state">Conecte a API para carregar os horarios.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/admin/app.js"></script>
+</body>
+</html>

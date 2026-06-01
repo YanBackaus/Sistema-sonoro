@@ -37,13 +37,19 @@ O menu do firmware foi reorganizado com a mesma ideia de maquina de estados do a
 ```text
 api/
   .env.example
+  index.js
   package.json
+  public/
+    admin/
+      app.js
+      index.html
+      styles.css
   src/
     config.js
     db.js
-    firebase.js
     server.js
     validation.js
+  vercel.json
 database/
   schema.sql
 esp32/
@@ -56,6 +62,7 @@ dashboard/
 ```
 
 `dashboard/` agora virou o painel web de administracao da agenda sonora. A API entrega esse painel em `GET /admin`.
+Para deploy na `Vercel`, o painel e sincronizado para `api/public/admin`.
 
 ## Banco MySQL
 
@@ -107,6 +114,52 @@ npm start
 API padrao:
 
 `http://localhost:3000`
+
+### Dashboard sincronizado
+
+O painel fonte continua em [dashboard/](/C:/Users/Schenkel_Dell/Desktop/marcelo/dashboard), mas a API agora usa:
+
+- `api/public/admin` para servir os arquivos
+- `npm run sync:dashboard` para copiar `dashboard/` para `api/public/admin`
+
+Esse sync ja roda automaticamente em:
+
+- `npm start`
+- `npm run dev`
+- `npm run vercel-build`
+
+### Deploy na Vercel
+
+Para a Vercel, use a pasta [api/](/C:/Users/Schenkel_Dell/Desktop/marcelo/api) como `Root Directory` do projeto.
+
+Arquivos preparados para isso:
+
+- [api/index.js](/C:/Users/Schenkel_Dell/Desktop/marcelo/api/index.js)
+- [api/vercel.json](/C:/Users/Schenkel_Dell/Desktop/marcelo/api/vercel.json)
+- [api/public/admin](/C:/Users/Schenkel_Dell/Desktop/marcelo/api/public/admin)
+
+Passo a passo:
+
+1. Importe o repositório na Vercel.
+2. Defina `Root Directory = api`.
+3. Configure as variaveis de ambiente no projeto:
+   - `API_KEY`
+   - `DEFAULT_UTC_OFFSET_MINUTES`
+   - `DEFAULT_POLL_INTERVAL_SECONDS`
+   - `MYSQL_HOST`
+   - `MYSQL_PORT`
+   - `MYSQL_DATABASE`
+   - `MYSQL_USER`
+   - `MYSQL_PASSWORD`
+4. Garanta que o MySQL esteja hospedado fora da sua maquina e acessivel pela Vercel.
+5. Faça o deploy.
+
+Observacoes importantes:
+
+- `PORT` e usado localmente; na Vercel a plataforma controla a porta.
+- O `dashboard` e servido como arquivo estatico em `public/admin`, porque a Vercel ignora `express.static()` para assets do Express.
+- O endpoint final da API vira algo como `https://seu-projeto.vercel.app`
+- No firmware do D1 mini, troque `API_BASE_URL` para a URL publica da Vercel.
 
 ## Rotas principais
 

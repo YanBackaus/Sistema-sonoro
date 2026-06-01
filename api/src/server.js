@@ -28,7 +28,8 @@ const {
 
 const app = express();
 const pool = createDatabasePool(config.mysql);
-const adminAppDirectory = path.resolve(__dirname, "../../dashboard");
+const adminAppDirectory = path.resolve(__dirname, "../public/admin");
+const adminIndexFile = path.join(adminAppDirectory, "index.html");
 
 app.use(express.json({ limit: "256kb" }));
 
@@ -68,7 +69,7 @@ app.get("/health", async (request, response) => {
 });
 
 app.get("/admin", (request, response) => {
-  response.sendFile(path.join(adminAppDirectory, "index.html"));
+  response.sendFile(adminIndexFile);
 });
 
 app.use("/admin", express.static(adminAppDirectory));
@@ -283,9 +284,11 @@ app.use((request, response) => {
   });
 });
 
-app.listen(config.port, () => {
-  console.log(`API running on http://localhost:${config.port}`);
-});
+if (require.main === module) {
+  app.listen(config.port, () => {
+    console.log(`API running on http://localhost:${config.port}`);
+  });
+}
 
 function requireApiKey(request, response, next) {
   if (request.headers["x-api-key"] !== config.apiKey) {
@@ -327,3 +330,5 @@ function formatConfigDevice(device) {
     last_seen_at: device.last_seen_at,
   };
 }
+
+module.exports = app;

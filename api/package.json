@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "API Node.js para gerenciar agendas sonoras de dispositivos D1 mini com OLED.",
-  "main": "src/server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "sync:dashboard": "node scripts/sync-dashboard.js",
+    "start": "npm run sync:dashboard && node src/server.js",
+    "dev": "npm run sync:dashboard && node --watch src/server.js",
+    "vercel-build": "npm run sync:dashboard"
   },
   "engines": {
     "node": ">=18"
@@ -14,7 +16,6 @@
   "dependencies": {
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "firebase-admin": "^13.10.0",
     "mysql2": "^3.22.3"
   }
 }
