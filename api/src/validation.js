@@ -34,6 +34,8 @@ function normalizeDevicePayload(payload, defaults) {
       3600,
       defaults.defaultPollIntervalSeconds
     ),
+    device_api_key: normalizeOptionalDeviceApiKey(payload.device_api_key),
+    rotate_device_api_key: normalizeBoolean(payload.rotate_device_api_key, false),
   };
 }
 
@@ -184,6 +186,23 @@ function normalizeDaysOfWeek(value) {
   const unique = [...new Set(value.map((item) => normalizeInteger(item, 0, 6)))];
   unique.sort((a, b) => a - b);
   return unique;
+}
+
+function normalizeOptionalDeviceApiKey(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (normalized.length < 12 || normalized.length > 128) {
+    throw new ValidationError("device_api_key must have between 12 and 128 characters.");
+  }
+
+  if (/\s/.test(normalized)) {
+    throw new ValidationError("device_api_key must not contain spaces.");
+  }
+
+  return normalized;
 }
 
 class ValidationError extends Error {}

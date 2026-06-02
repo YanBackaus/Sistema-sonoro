@@ -290,6 +290,25 @@ button:active {
   line-height: 1.6;
 }
 
+.provisioning-panel {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(18, 123, 105, 0.18);
+  background: rgba(18, 123, 105, 0.08);
+}
+
+.provisioning-value {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(18, 123, 105, 0.14);
+  color: var(--accent-strong);
+}
+
 .section-head {
   display: flex;
   align-items: flex-start;
@@ -336,6 +355,10 @@ button:active {
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.summary-list dd {
+  overflow-wrap: anywhere;
 }
 
 .day-grid {

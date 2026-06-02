@@ -1,9 +1,13 @@
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
+using SecureApiClient = BearSSL::WiFiClientSecure;
 #elif defined(ESP32)
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+using SecureApiClient = WiFiClientSecure;
 #else
 #error "Plataforma nao suportada. Use ESP8266 ou ESP32."
 #endif
@@ -16,15 +20,7 @@
 #include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-
-static const char* WIFI_SSID = "Archer_Home_EXT";
-static const char* WIFI_PASSWORD = "semsenha";
-//static const char* WIFI_SSID = "Schenkel";
-//static const char* WIFI_PASSWORD = "00133200";
-static const char* API_BASE_URL = "http://192.168.0.114:3000";
-//static const char* API_BASE_URL = "http://10.149.130.251:3000";
-static const char* API_KEY = "d1mini_scheduler_2026_01";
-static const char* DEVICE_ID = "d1mini_02";
+#include "secrets.h"
 static const char* FIRMWARE_VERSION = "1.0.0";
    
 static const int SCREEN_WIDTH = 128;
@@ -191,6 +187,9 @@ bool restoreCachedTimeFromCache();
 bool applyServerTimeFromJson(JsonVariant value);
 bool parseUtcIso8601(const char* value, time_t* result);
 int64_t daysFromCivil(int year, unsigned month, unsigned day);
+bool beginApiRequest(HTTPClient& http, WiFiClient& plainClient, SecureApiClient& secureClient, const String& url);
+bool isSecureApiUrl(const String& url);
+bool configureSecureApiClient(SecureApiClient& secureClient);
 
 void setup() {
   Serial.begin(115200);
@@ -463,6 +462,42 @@ void printI2cHints() {
   Serial.println("Se ainda nao funcionar, ela pode ser SH1106 em vez de SSD1306.");
 }
 
+bool beginApiRequest(HTTPClient& http, WiFiClient& plainClient, SecureApiClient& secureClient, const String& url) {
+  if (!isSecureApiUrl(url)) {
+    return http.begin(plainClient, url);
+  }
+
+  if (!configureSecureApiClient(secureClient)) {
+    lastSyncMessage = "TLS invalido";
+    return false;
+  }
+
+  return http.begin(secureClient, url);
+}
+
+bool isSecureApiUrl(const String& url) {
+  return url.startsWith("https://");
+}
+
+bool configureSecureApiClient(SecureApiClient& secureClient) {
+  if (DEVICE_ALLOW_INSECURE_TLS) {
+    secureClient.setInsecure();
+    return true;
+  }
+
+  if (strlen(API_ROOT_CA) < 64) {
+    return false;
+  }
+
+#if defined(ESP8266)
+  static BearSSL::X509List trustAnchor(API_ROOT_CA);
+  secureClient.setTrustAnchors(&trustAnchor);
+#else
+  secureClient.setCACert(API_ROOT_CA);
+#endif
+  return true;
+}
+
 bool syncWithApi(const char* reason) {
   if (strcmp(reason, "boot") != 0 && shouldProtectUpcomingAlarm()) {
     lastSyncMessage = "Perto do toque";
@@ -477,19 +512,20 @@ bool syncWithApi(const char* reason) {
     return false;
   }
 
-  WiFiClient client;
+  WiFiClient plainClient;
+  SecureApiClient secureClient;
   HTTPClient http;
   String url = String(API_BASE_URL) + "/api/devices/" + DEVICE_ID + "/heartbeat";
 
-  if (!http.begin(client, url)) {
+  if (!beginApiRequest(http, plainClient, secureClient, url)) {
     apiOnline = false;
-    lastSyncMessage = scheduleCount > 0 ? "Modo offline" : "Falha HTTP";
+    lastSyncMessage = scheduleCount > 0 ? "Modo offline" : "Falha conexao";
     return false;
   }
 
   http.setTimeout(API_HTTP_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-API-KEY", API_KEY);
+  http.addHeader("X-DEVICE-KEY", DEVICE_API_KEY);
 
   String payload = buildHeartbeatPayload(reason);
   int httpCode = http.POST(payload);
@@ -712,17 +748,18 @@ void sendEvent(const char* eventType, const char* message, int scheduleId) {
     return;
   }
 
-  WiFiClient client;
+  WiFiClient plainClient;
+  SecureApiClient secureClient;
   HTTPClient http;
   String url = String(API_BASE_URL) + "/api/devices/" + DEVICE_ID + "/events";
 
-  if (!http.begin(client, url)) {
+  if (!beginApiRequest(http, plainClient, secureClient, url)) {
     return;
   }
 
   http.setTimeout(API_HTTP_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-API-KEY", API_KEY);
+  http.addHeader("X-DEVICE-KEY", DEVICE_API_KEY);
 
   StaticJsonDocument<384> doc;
   doc["event_type"] = eventType;

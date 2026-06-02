@@ -21,11 +21,14 @@ const elements = {
   browserBadge: document.querySelector("#browserBadge"),
   configHint: document.querySelector("#configHint"),
   connectButton: document.querySelector("#connectButton"),
+  deviceApiKeyInput: document.querySelector("#deviceApiKeyInput"),
   deviceForm: document.querySelector("#deviceForm"),
   deviceIdInput: document.querySelector("#deviceIdInput"),
   deviceLocationInput: document.querySelector("#deviceLocationInput"),
   deviceMenuTitleInput: document.querySelector("#deviceMenuTitleInput"),
   deviceNameInput: document.querySelector("#deviceNameInput"),
+  deviceProvisioningPanel: document.querySelector("#deviceProvisioningPanel"),
+  deviceProvisioningValue: document.querySelector("#deviceProvisioningValue"),
   deviceSelect: document.querySelector("#deviceSelect"),
   deviceStatusText: document.querySelector("#deviceStatusText"),
   enabledInput: document.querySelector("#enabledInput"),
@@ -45,6 +48,7 @@ const elements = {
   scheduleMinuteInput: document.querySelector("#scheduleMinuteInput"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
   summaryActiveSchedules: document.querySelector("#summaryActiveSchedules"),
+  summaryDeviceKey: document.querySelector("#summaryDeviceKey"),
   summaryLastSeen: document.querySelector("#summaryLastSeen"),
   summaryLocalSound: document.querySelector("#summaryLocalSound"),
   summaryLocation: document.querySelector("#summaryLocation"),
@@ -52,6 +56,7 @@ const elements = {
   summarySoundEnabled: document.querySelector("#summarySoundEnabled"),
   toneHzInput: document.querySelector("#toneHzInput"),
   toneMsInput: document.querySelector("#toneMsInput"),
+  rotateDeviceApiKeyInput: document.querySelector("#rotateDeviceApiKeyInput"),
 };
 
 bootstrap();
@@ -64,10 +69,10 @@ function bootstrap() {
 
   state.apiBaseUrl = localStorage.getItem(STORAGE_KEYS.apiBaseUrl) || defaultBaseUrl;
   localStorage.removeItem("scheduler_api_key");
-  state.apiKey = sessionStorage.getItem("scheduler_api_key") || "";
+  state.apiKey = "";
 
   elements.apiBaseUrlInput.value = state.apiBaseUrl;
-  elements.apiKeyInput.value = state.apiKey;
+  elements.apiKeyInput.value = "";
 
   updateBrowserStatus();
   window.addEventListener("online", updateBrowserStatus);
@@ -86,7 +91,7 @@ function bootstrap() {
     refreshEverything();
   } else {
     setApiBadge("API: informe a chave", false);
-    setHint("Digite a API Key da sua .env para carregar os devices e os horarios.");
+    setHint("Digite a chave admin da API para carregar os devices e os horarios.");
   }
 }
 
@@ -101,12 +106,12 @@ async function handleConnect() {
   }
 
   localStorage.setItem(STORAGE_KEYS.apiBaseUrl, state.apiBaseUrl);
-  sessionStorage.setItem("scheduler_api_key", state.apiKey);
   await refreshEverything();
 }
 
 async function refreshEverything() {
   try {
+    clearDeviceProvisioning();
     setLoadingState("Carregando devices...");
     const devicesResponse = await apiRequest("/api/devices");
     state.devices = Array.isArray(devicesResponse.devices) ? devicesResponse.devices : [];
@@ -139,6 +144,7 @@ async function refreshEverything() {
 
 async function handleDeviceSelection(event) {
   resetScheduleForm();
+  clearDeviceProvisioning();
   state.selectedDeviceId = event.target.value;
   await loadSelectedDevice();
 }
@@ -152,6 +158,8 @@ async function handleDeviceSave(event) {
       name: elements.deviceNameInput.value.trim(),
       location: elements.deviceLocationInput.value.trim(),
       menu_title: elements.deviceMenuTitleInput.value.trim(),
+      device_api_key: elements.deviceApiKeyInput.value.trim() || undefined,
+      rotate_device_api_key: elements.rotateDeviceApiKeyInput.checked,
     };
 
     setLoadingState("Salvando device...");
@@ -164,6 +172,7 @@ async function handleDeviceSave(event) {
     state.selectedDeviceId = savedDeviceId;
 
     await refreshEverything();
+    renderDeviceProvisioning(response.provisioning || null, savedDeviceId);
     showFlash(`Device ${savedDeviceId} salvo com sucesso.`, "success");
   } catch (error) {
     handleRequestFailure(error, "Nao foi possivel salvar o device.");
@@ -344,6 +353,8 @@ function fillDeviceForm(device) {
   elements.deviceNameInput.value = device.name || "";
   elements.deviceLocationInput.value = device.location || "";
   elements.deviceMenuTitleInput.value = device.menu_title || "";
+  elements.deviceApiKeyInput.value = "";
+  elements.rotateDeviceApiKeyInput.checked = false;
 }
 
 function renderDeviceOptions() {
@@ -374,6 +385,7 @@ function renderDeviceSummary(device) {
   elements.summaryActiveSchedules.textContent = String(activeScheduleCount);
   elements.summarySoundEnabled.textContent = formatBoolean(device?.sound_enabled);
   elements.summaryLocalSound.textContent = formatBoolean(device?.local_sound_enabled);
+  elements.summaryDeviceKey.textContent = formatDeviceKeyStatus(device);
 }
 
 function renderSchedules(schedules) {
@@ -595,7 +607,7 @@ async function apiRequest(path, options = {}) {
   const payload = await parseJsonSafely(response);
 
   if (!response.ok) {
-    throw new Error(payload?.error || payload?.details || `HTTP ${response.status}`);
+    throw new Error(payload?.error || `HTTP ${response.status}`);
   }
 
   return payload;
@@ -650,6 +662,38 @@ function formatBoolean(value) {
   }
 
   return "--";
+}
+
+function formatDeviceKeyStatus(device) {
+  if (!device) {
+    return "--";
+  }
+
+  if (!device.has_device_api_key) {
+    return "Pendente";
+  }
+
+  return device.device_api_key_last4
+    ? `Configurada (...${device.device_api_key_last4})`
+    : "Configurada";
+}
+
+function renderDeviceProvisioning(provisioning, deviceId) {
+  if (!provisioning?.device_api_key) {
+    clearDeviceProvisioning();
+    return;
+  }
+
+  elements.deviceProvisioningPanel.hidden = false;
+  elements.deviceProvisioningValue.textContent = provisioning.device_api_key;
+  setHint(
+    `Nova chave do device ${deviceId} pronta. Grave-a no firmware como DEVICE_API_KEY e guarde-a fora do navegador.`
+  );
+}
+
+function clearDeviceProvisioning() {
+  elements.deviceProvisioningPanel.hidden = true;
+  elements.deviceProvisioningValue.textContent = "";
 }
 
 function escapeHtml(value) {

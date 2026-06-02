@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS devices (
     name VARCHAR(80) NOT NULL,
     location VARCHAR(120) DEFAULT NULL,
     menu_title VARCHAR(80) DEFAULT NULL,
+    device_api_key_hash CHAR(64) DEFAULT NULL,
+    device_api_key_last4 CHAR(4) DEFAULT NULL,
     sound_enabled TINYINT(1) NOT NULL DEFAULT 1,
     local_sound_enabled TINYINT(1) DEFAULT NULL,
     utc_offset_minutes SMALLINT NOT NULL DEFAULT -180,
@@ -25,6 +27,38 @@ CREATE TABLE IF NOT EXISTS devices (
     PRIMARY KEY (id),
     UNIQUE KEY uq_devices_device_id (device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @current_schema = DATABASE();
+
+SET @ddl = IF(
+  EXISTS(
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @current_schema
+      AND TABLE_NAME = 'devices'
+      AND COLUMN_NAME = 'device_api_key_hash'
+  ),
+  'SELECT 1',
+  'ALTER TABLE devices ADD COLUMN device_api_key_hash CHAR(64) DEFAULT NULL AFTER menu_title'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  EXISTS(
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @current_schema
+      AND TABLE_NAME = 'devices'
+      AND COLUMN_NAME = 'device_api_key_last4'
+  ),
+  'SELECT 1',
+  'ALTER TABLE devices ADD COLUMN device_api_key_last4 CHAR(4) DEFAULT NULL AFTER device_api_key_hash'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS device_schedules (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

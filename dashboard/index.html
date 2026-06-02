@@ -43,7 +43,7 @@
           <input
             id="apiKeyInput"
             type="password"
-            placeholder="Digite a mesma chave da .env"
+            placeholder="Digite a chave admin da API"
             autocomplete="off"
           >
         </label>
@@ -106,6 +106,34 @@
               </label>
             </div>
 
+            <label class="field">
+              <span>Chave do device (opcional)</span>
+              <input
+                id="deviceApiKeyInput"
+                type="password"
+                placeholder="Deixe vazio para manter a atual ou gerar a primeira"
+                autocomplete="off"
+              >
+            </label>
+
+            <label class="toggle">
+              <input id="rotateDeviceApiKeyInput" type="checkbox">
+              <span>Gerar uma nova chave do device ao salvar</span>
+            </label>
+
+            <p class="hint">
+              Cada placa agora usa a propria chave no firmware. A chave admin do painel nao vai para o D1 mini.
+            </p>
+
+            <div class="provisioning-panel" id="deviceProvisioningPanel" hidden>
+              <p class="section-kicker">Provisionamento</p>
+              <strong>Chave pronta para gravar no firmware</strong>
+              <code id="deviceProvisioningValue" class="provisioning-value"></code>
+              <p class="hint">
+                Guarde esta chave agora. Por seguranca ela so aparece quando for criada, definida manualmente ou rotacionada.
+              </p>
+            </div>
+
             <button type="submit">Salvar device</button>
           </form>
         </article>
@@ -142,6 +170,10 @@
             <div>
               <dt>Som local</dt>
               <dd id="summaryLocalSound">--</dd>
+            </div>
+            <div>
+              <dt>Chave do device</dt>
+              <dd id="summaryDeviceKey">--</dd>
             </div>
           </dl>
         </article>

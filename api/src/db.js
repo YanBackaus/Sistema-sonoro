@@ -1,4 +1,9 @@
 const mysql = require("mysql2/promise");
+const {
+  generateDeviceApiKey,
+  getKeyLast4,
+  hashDeviceApiKey,
+} = require("./security");
 
 function createDatabasePool(mysqlConfig) {
   const poolConfig = {
@@ -26,34 +31,23 @@ function createDatabasePool(mysqlConfig) {
   return mysql.createPool(poolConfig);
 }
 
-async function ensureDevice(pool, device) {
-  await pool.execute(
-    `INSERT INTO devices (
-      device_id,
-      name,
-      menu_title,
-      utc_offset_minutes,
-      poll_interval_seconds
-    ) VALUES (
-      :device_id,
-      :name,
-      :menu_title,
-      :utc_offset_minutes,
-      :poll_interval_seconds
-    )
-    ON DUPLICATE KEY UPDATE
-      device_id = device_id`,
-    {
-      device_id: device.device_id,
-      name: device.name || device.device_id,
-      menu_title: device.menu_title || device.name || device.device_id,
-      utc_offset_minutes: device.utc_offset_minutes,
-      poll_interval_seconds: device.poll_interval_seconds,
-    }
-  );
-}
+async function upsertDevice(pool, device, securityConfig) {
+  const currentAuth = await getDeviceAuthRecord(pool, device.device_id);
+  let provisionedKey = null;
+  let deviceApiKeyHash = currentAuth?.device_api_key_hash || null;
+  let deviceApiKeyLast4 = currentAuth?.device_api_key_last4 || null;
 
-async function upsertDevice(pool, device) {
+  if (device.device_api_key) {
+    provisionedKey = device.device_api_key;
+  } else if (device.rotate_device_api_key || !deviceApiKeyHash) {
+    provisionedKey = generateDeviceApiKey();
+  }
+
+  if (provisionedKey) {
+    deviceApiKeyHash = hashDeviceApiKey(provisionedKey, securityConfig.deviceKeyPepper);
+    deviceApiKeyLast4 = getKeyLast4(provisionedKey);
+  }
+
   await pool.execute(
     `INSERT INTO devices (
       device_id,
@@ -62,7 +56,9 @@ async function upsertDevice(pool, device) {
       menu_title,
       sound_enabled,
       utc_offset_minutes,
-      poll_interval_seconds
+      poll_interval_seconds,
+      device_api_key_hash,
+      device_api_key_last4
     ) VALUES (
       :device_id,
       :name,
@@ -70,7 +66,9 @@ async function upsertDevice(pool, device) {
       :menu_title,
       :sound_enabled,
       :utc_offset_minutes,
-      :poll_interval_seconds
+      :poll_interval_seconds,
+      :device_api_key_hash,
+      :device_api_key_last4
     )
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
@@ -78,7 +76,9 @@ async function upsertDevice(pool, device) {
       menu_title = VALUES(menu_title),
       sound_enabled = VALUES(sound_enabled),
       utc_offset_minutes = VALUES(utc_offset_minutes),
-      poll_interval_seconds = VALUES(poll_interval_seconds)`,
+      poll_interval_seconds = VALUES(poll_interval_seconds),
+      device_api_key_hash = VALUES(device_api_key_hash),
+      device_api_key_last4 = VALUES(device_api_key_last4)`,
     {
       device_id: device.device_id,
       name: device.name,
@@ -87,10 +87,20 @@ async function upsertDevice(pool, device) {
       sound_enabled: device.sound_enabled ? 1 : 0,
       utc_offset_minutes: device.utc_offset_minutes,
       poll_interval_seconds: device.poll_interval_seconds,
+      device_api_key_hash: deviceApiKeyHash,
+      device_api_key_last4: deviceApiKeyLast4,
     }
   );
 
-  return getDeviceDetails(pool, device.device_id);
+  return {
+    device: await getDeviceDetails(pool, device.device_id),
+    provisioning: provisionedKey
+      ? {
+          device_api_key: provisionedKey,
+          device_api_key_last4: deviceApiKeyLast4,
+        }
+      : null,
+  };
 }
 
 async function listDevices(pool) {
@@ -99,6 +109,7 @@ async function listDevices(pool) {
       d.device_id,
       d.name,
       d.location,
+      d.menu_title,
       d.sound_enabled,
       d.local_sound_enabled,
       d.utc_offset_minutes,
@@ -106,6 +117,8 @@ async function listDevices(pool) {
       d.last_seen_at,
       d.current_screen,
       d.last_rssi,
+      d.device_api_key_last4,
+      CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
       (
         SELECT COUNT(*)
         FROM device_schedules s
@@ -135,6 +148,8 @@ async function getDeviceDetails(pool, deviceId) {
       firmware_version,
       current_screen,
       current_menu,
+      device_api_key_last4,
+      CASE WHEN device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
       created_at,
       updated_at
     FROM devices
@@ -154,15 +169,21 @@ async function getDeviceDetails(pool, deviceId) {
   };
 }
 
-async function getDeviceConfig(pool, deviceId, defaults) {
-  await ensureDevice(pool, {
-    device_id: deviceId,
-    name: deviceId,
-    menu_title: deviceId,
-    utc_offset_minutes: defaults.defaultUtcOffsetMinutes,
-    poll_interval_seconds: defaults.defaultPollIntervalSeconds,
-  });
+async function getDeviceAuthRecord(pool, deviceId) {
+  const [rows] = await pool.execute(
+    `SELECT
+      device_id,
+      device_api_key_hash,
+      device_api_key_last4
+    FROM devices
+    WHERE device_id = :device_id`,
+    { device_id: deviceId }
+  );
 
+  return rows.length ? rows[0] : null;
+}
+
+async function getDeviceConfig(pool, deviceId) {
   return getDeviceDetails(pool, deviceId);
 }
 
@@ -312,16 +333,8 @@ async function getScheduleById(pool, scheduleId) {
   return rows.length ? formatScheduleRow(rows[0]) : null;
 }
 
-async function updateDeviceHeartbeat(pool, deviceId, heartbeat, defaults) {
-  await ensureDevice(pool, {
-    device_id: deviceId,
-    name: deviceId,
-    menu_title: deviceId,
-    utc_offset_minutes: defaults.defaultUtcOffsetMinutes,
-    poll_interval_seconds: defaults.defaultPollIntervalSeconds,
-  });
-
-  await pool.execute(
+async function updateDeviceHeartbeat(pool, deviceId, heartbeat) {
+  const [result] = await pool.execute(
     `UPDATE devices
     SET
       last_seen_at = UTC_TIMESTAMP(),
@@ -345,6 +358,8 @@ async function updateDeviceHeartbeat(pool, deviceId, heartbeat, defaults) {
           : null,
     }
   );
+
+  return result.affectedRows > 0;
 }
 
 async function insertDeviceEvent(pool, deviceId, event) {
@@ -383,7 +398,9 @@ function formatDeviceRow(row) {
     menu_title: row.menu_title,
     sound_enabled: Boolean(row.sound_enabled),
     local_sound_enabled:
-      row.local_sound_enabled === null ? null : Boolean(row.local_sound_enabled),
+      row.local_sound_enabled === null || row.local_sound_enabled === undefined
+        ? null
+        : Boolean(row.local_sound_enabled),
     utc_offset_minutes: row.utc_offset_minutes,
     poll_interval_seconds: row.poll_interval_seconds,
     last_seen_at: row.last_seen_at,
@@ -393,6 +410,8 @@ function formatDeviceRow(row) {
     current_screen: row.current_screen,
     current_menu: row.current_menu,
     active_schedule_count: row.active_schedule_count,
+    has_device_api_key: Boolean(row.has_device_api_key),
+    device_api_key_last4: row.device_api_key_last4 || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -425,6 +444,7 @@ module.exports = {
   upsertDevice,
   listDevices,
   getDeviceDetails,
+  getDeviceAuthRecord,
   getDeviceConfig,
   listSchedulesForDevice,
   createSchedule,

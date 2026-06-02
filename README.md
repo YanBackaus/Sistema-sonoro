@@ -88,7 +88,10 @@ Configure `.env` a partir de [.env.example](/C:/Users/Schenkel_Dell/Desktop/marc
 ### Variaveis principais
 
 - `PORT`
-- `API_KEY`
+- `ADMIN_API_KEY`
+- `API_KEY` como fallback de compatibilidade
+- `DEVICE_KEY_PEPPER`
+- `EXPOSE_ERROR_DETAILS`
 - `DEFAULT_UTC_OFFSET_MINUTES`
 - `DEFAULT_POLL_INTERVAL_SECONDS`
 - `MYSQL_HOST`
@@ -211,11 +214,18 @@ Exemplo:
   "name": "Sala 1",
   "location": "Recepcao",
   "menu_title": "Sala 1",
+  "rotate_device_api_key": true,
   "sound_enabled": true,
   "utc_offset_minutes": -180,
   "poll_interval_seconds": 60
 }
 ```
+
+Observacoes:
+
+- a resposta pode trazer `provisioning.device_api_key` quando a chave do device for criada, definida manualmente ou rotacionada
+- essa chave vai para o firmware como `DEVICE_API_KEY`
+- o backend guarda so o hash dessa chave no banco
 
 ### Configuracao que o D1 mini consome
 
@@ -304,9 +314,10 @@ Abra no navegador:
 
 O painel permite:
 
-- conectar com `API Base URL` e `API Key`
+- conectar com `API Base URL` e a chave admin
 - listar os devices cadastrados
 - cadastrar ou atualizar um device
+- gerar ou rotacionar a chave individual de cada device
 - criar novos horarios
 - editar horarios existentes
 - ativar ou desativar um horario ja cadastrado
@@ -328,11 +339,13 @@ Arquivo principal:
 
 ### Ajustes no inicio do arquivo
 
-- `WIFI_SSID`
-- `WIFI_PASSWORD`
-- `API_BASE_URL`
-- `API_KEY`
-- `DEVICE_ID`
+- copie [secrets.example.h](/C:/Users/Schenkel_Dell/Desktop/marcelo/esp32/esp32_oled_mysql_firebase/secrets.example.h) para `secrets.h`
+- preencha `WIFI_SSID`
+- preencha `WIFI_PASSWORD`
+- use `API_BASE_URL` com `https://`
+- grave a chave individual em `DEVICE_API_KEY`
+- ajuste `DEVICE_ID`
+- configure `API_ROOT_CA` com a raiz da sua API, ou use `DEVICE_ALLOW_INSECURE_TLS=true` apenas em teste local temporario
 
 ### Funcoes principais do firmware
 
@@ -342,6 +355,7 @@ Arquivo principal:
 - tocar buzzer nos horarios configurados
 - registrar evento quando um horario toca
 - mostrar menu no OLED
+- autenticar com `X-DEVICE-KEY`, nao mais com uma chave global compartilhada
 
 ### Menu atual no OLED
 
@@ -397,3 +411,5 @@ Observacao:
 - A placa entra em modo offline com a ultima agenda salva quando a API ou o Wi-Fi caem.
 - As tentativas de Wi-Fi/API continuam periodicas, mas ficam pausadas perto do proximo horario para priorizar o toque.
 - O painel atual cobre cadastro, edicao, ativacao, desativacao e exclusao de horarios. Se voce quiser, o proximo passo natural e adicionar uma pagina de eventos.
+- O acesso admin e separado da autenticacao dos devices. Cada placa deve ter sua propria `DEVICE_API_KEY`.
+- Para ambiente local com Aiven, prefira `MYSQL_SSL_CA_PATH` apontando para um `.pem`; para Vercel, use `MYSQL_SSL_CA` no painel de envs.

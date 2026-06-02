@@ -6,6 +6,7 @@ const {
   upsertDevice,
   listDevices,
   getDeviceDetails,
+  getDeviceAuthRecord,
   getDeviceConfig,
   listSchedulesForDevice,
   createSchedule,
@@ -15,6 +16,7 @@ const {
   updateDeviceHeartbeat,
   insertDeviceEvent,
 } = require("./db");
+const { verifyDeviceApiKey } = require("./security");
 const {
   ValidationError,
   normalizeDeviceId,
@@ -31,7 +33,21 @@ const pool = createDatabasePool(config.mysql);
 const adminAppDirectory = path.resolve(__dirname, "../public/admin");
 const adminIndexFile = path.join(adminAppDirectory, "index.html");
 
+app.disable("x-powered-by");
 app.use(express.json({ limit: "256kb" }));
+app.use(handleRequestParsingError);
+app.use((request, response, next) => {
+  response.setHeader("Referrer-Policy", "same-origin");
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  if (request.path === "/admin" || request.path.startsWith("/admin/")) {
+    response.setHeader("Cache-Control", "no-store");
+  }
+
+  next();
+});
 
 app.get("/", (request, response) => {
   response.json({
@@ -60,11 +76,7 @@ app.get("/health", async (request, response) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    response.status(500).json({
-      ok: false,
-      error: "Database health check failed.",
-      details: error.message,
-    });
+    response.status(500).json(buildInternalErrorPayload(error, "Database health check failed."));
   }
 });
 
@@ -74,7 +86,7 @@ app.get("/admin", (request, response) => {
 
 app.use("/admin", express.static(adminAppDirectory));
 
-app.get("/api/devices", requireApiKey, async (request, response) => {
+app.get("/api/devices", requireAdminAccess, async (request, response) => {
   try {
     const devices = await listDevices(pool);
     response.json({
@@ -82,29 +94,26 @@ app.get("/api/devices", requireApiKey, async (request, response) => {
       devices,
     });
   } catch (error) {
-    response.status(500).json({
-      ok: false,
-      error: "Internal server error.",
-      details: error.message,
-    });
+    response.status(500).json(buildInternalErrorPayload(error));
   }
 });
 
-app.post("/api/devices", requireApiKey, async (request, response) => {
+app.post("/api/devices", requireAdminAccess, async (request, response) => {
   try {
     const device = normalizeDevicePayload(request.body || {}, config);
-    const saved = await upsertDevice(pool, device);
+    const saved = await upsertDevice(pool, device, config);
 
     response.status(201).json({
       ok: true,
-      device: saved,
+      device: saved.device,
+      provisioning: saved.provisioning,
     });
   } catch (error) {
     handleApiError(error, response);
   }
 });
 
-app.get("/api/devices/:deviceId", requireApiKey, async (request, response) => {
+app.get("/api/devices/:deviceId", requireAdminAccess, async (request, response) => {
   try {
     const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
     const device = await getDeviceDetails(pool, deviceId);
@@ -126,10 +135,18 @@ app.get("/api/devices/:deviceId", requireApiKey, async (request, response) => {
   }
 });
 
-app.get("/api/devices/:deviceId/config", requireApiKey, async (request, response) => {
+app.get("/api/devices/:deviceId/config", requireDeviceAccess, async (request, response) => {
   try {
-    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
-    const device = await getDeviceConfig(pool, deviceId, config);
+    const deviceId = request.authorizedDeviceId;
+    const device = await getDeviceConfig(pool, deviceId);
+
+    if (!device) {
+      response.status(404).json({
+        ok: false,
+        error: "Device not found.",
+      });
+      return;
+    }
 
     response.json({
       ok: true,
@@ -142,13 +159,28 @@ app.get("/api/devices/:deviceId/config", requireApiKey, async (request, response
   }
 });
 
-app.post("/api/devices/:deviceId/heartbeat", requireApiKey, async (request, response) => {
+app.post("/api/devices/:deviceId/heartbeat", requireDeviceAccess, async (request, response) => {
   try {
-    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+    const deviceId = request.authorizedDeviceId;
     const heartbeat = normalizeHeartbeatPayload(request.body || {});
 
-    await updateDeviceHeartbeat(pool, deviceId, heartbeat, config);
-    const device = await getDeviceConfig(pool, deviceId, config);
+    const updated = await updateDeviceHeartbeat(pool, deviceId, heartbeat);
+    if (!updated) {
+      response.status(404).json({
+        ok: false,
+        error: "Device not found.",
+      });
+      return;
+    }
+
+    const device = await getDeviceConfig(pool, deviceId);
+    if (!device) {
+      response.status(404).json({
+        ok: false,
+        error: "Device not found.",
+      });
+      return;
+    }
 
     response.json({
       ok: true,
@@ -161,11 +193,19 @@ app.post("/api/devices/:deviceId/heartbeat", requireApiKey, async (request, resp
   }
 });
 
-app.post("/api/devices/:deviceId/events", requireApiKey, async (request, response) => {
+app.post("/api/devices/:deviceId/events", requireDeviceAccess, async (request, response) => {
   try {
-    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+    const deviceId = request.authorizedDeviceId;
     const event = normalizeEventPayload(request.body || {});
-    await getDeviceConfig(pool, deviceId, config);
+    const device = await getDeviceConfig(pool, deviceId);
+
+    if (!device) {
+      response.status(404).json({
+        ok: false,
+        error: "Device not found.",
+      });
+      return;
+    }
 
     await insertDeviceEvent(pool, deviceId, event);
 
@@ -178,7 +218,7 @@ app.post("/api/devices/:deviceId/events", requireApiKey, async (request, respons
   }
 });
 
-app.get("/api/devices/:deviceId/schedules", requireApiKey, async (request, response) => {
+app.get("/api/devices/:deviceId/schedules", requireAdminAccess, async (request, response) => {
   try {
     const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
     const schedules = await listSchedulesForDevice(pool, deviceId);
@@ -193,10 +233,18 @@ app.get("/api/devices/:deviceId/schedules", requireApiKey, async (request, respo
   }
 });
 
-app.post("/api/devices/:deviceId/schedules", requireApiKey, async (request, response) => {
+app.post("/api/devices/:deviceId/schedules", requireAdminAccess, async (request, response) => {
   try {
     const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
-    await getDeviceConfig(pool, deviceId, config);
+    const device = await getDeviceConfig(pool, deviceId);
+    if (!device) {
+      response.status(404).json({
+        ok: false,
+        error: "Device not found.",
+      });
+      return;
+    }
+
     const schedule = normalizeSchedulePayload(request.body || {});
     const saved = await createSchedule(pool, deviceId, schedule);
 
@@ -209,7 +257,7 @@ app.post("/api/devices/:deviceId/schedules", requireApiKey, async (request, resp
   }
 });
 
-app.put("/api/schedules/:scheduleId", requireApiKey, async (request, response) => {
+app.put("/api/schedules/:scheduleId", requireAdminAccess, async (request, response) => {
   try {
     const scheduleId = normalizeScheduleId(request.params.scheduleId);
     const schedule = normalizeSchedulePayload(request.body || {});
@@ -232,7 +280,7 @@ app.put("/api/schedules/:scheduleId", requireApiKey, async (request, response) =
   }
 });
 
-app.patch("/api/schedules/:scheduleId/enabled", requireApiKey, async (request, response) => {
+app.patch("/api/schedules/:scheduleId/enabled", requireAdminAccess, async (request, response) => {
   try {
     const scheduleId = normalizeScheduleId(request.params.scheduleId);
     const enabled = normalizeBoolean(request.body?.enabled);
@@ -255,7 +303,7 @@ app.patch("/api/schedules/:scheduleId/enabled", requireApiKey, async (request, r
   }
 });
 
-app.delete("/api/schedules/:scheduleId", requireApiKey, async (request, response) => {
+app.delete("/api/schedules/:scheduleId", requireAdminAccess, async (request, response) => {
   try {
     const scheduleId = normalizeScheduleId(request.params.scheduleId);
     const removed = await deleteSchedule(pool, scheduleId);
@@ -284,22 +332,80 @@ app.use((request, response) => {
   });
 });
 
+app.use(handleUnexpectedError);
+
 if (require.main === module) {
   app.listen(config.port, () => {
     console.log(`API running on http://localhost:${config.port}`);
   });
 }
 
-function requireApiKey(request, response, next) {
-  if (request.headers["x-api-key"] !== config.apiKey) {
+function requireAdminAccess(request, response, next) {
+  if (!isAdminKeyValid(request.headers["x-api-key"])) {
     response.status(401).json({
       ok: false,
-      error: "Invalid API key.",
+      error: "Invalid admin API key.",
     });
     return;
   }
 
   next();
+}
+
+async function requireDeviceAccess(request, response, next) {
+  try {
+    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+
+    if (isAdminKeyValid(request.headers["x-api-key"])) {
+      request.authorizedDeviceId = deviceId;
+      next();
+      return;
+    }
+
+    const deviceKey = String(request.headers["x-device-key"] || "").trim();
+    if (!deviceKey) {
+      response.status(401).json({
+        ok: false,
+        error: "Invalid device credentials.",
+      });
+      return;
+    }
+
+    const authRecord = await getDeviceAuthRecord(pool, deviceId);
+    const isAuthorized =
+      authRecord &&
+      authRecord.device_api_key_hash &&
+      verifyDeviceApiKey(deviceKey, authRecord.device_api_key_hash, config.deviceKeyPepper);
+
+    if (!isAuthorized) {
+      response.status(401).json({
+        ok: false,
+        error: "Invalid device credentials.",
+      });
+      return;
+    }
+
+    request.authorizedDeviceId = deviceId;
+    next();
+  } catch (error) {
+    handleApiError(error, response);
+  }
+}
+
+function isAdminKeyValid(value) {
+  return String(value || "").trim() !== "" && value === config.adminApiKey;
+}
+
+function handleRequestParsingError(error, request, response, next) {
+  if (error?.type === "entity.parse.failed" || error instanceof SyntaxError) {
+    response.status(400).json({
+      ok: false,
+      error: "Malformed JSON body.",
+    });
+    return;
+  }
+
+  next(error);
 }
 
 function handleApiError(error, response) {
@@ -311,11 +417,37 @@ function handleApiError(error, response) {
     return;
   }
 
-  response.status(500).json({
+  response.status(500).json(buildInternalErrorPayload(error));
+}
+
+function handleUnexpectedError(error, request, response, next) {
+  if (response.headersSent) {
+    next(error);
+    return;
+  }
+
+  if (error instanceof ValidationError) {
+    response.status(422).json({
+      ok: false,
+      error: error.message,
+    });
+    return;
+  }
+
+  response.status(500).json(buildInternalErrorPayload(error));
+}
+
+function buildInternalErrorPayload(error, message = "Internal server error.") {
+  const payload = {
     ok: false,
-    error: "Internal server error.",
-    details: error.message,
-  });
+    error: message,
+  };
+
+  if (config.exposeErrorDetails && error?.message) {
+    payload.details = error.message;
+  }
+
+  return payload;
 }
 
 function formatConfigDevice(device) {

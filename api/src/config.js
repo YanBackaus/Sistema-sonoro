@@ -13,9 +13,24 @@ function getRequiredEnv(name) {
   return value.trim();
 }
 
+function getOptionalEnv(name) {
+  const value = process.env[name];
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized === "" ? null : normalized;
+}
+
+const adminApiKey = getOptionalEnv("ADMIN_API_KEY") || getRequiredEnv("API_KEY");
+const deviceKeyPepper = getOptionalEnv("DEVICE_KEY_PEPPER") || adminApiKey;
+
 const config = {
   port: Number(process.env.PORT || 3000),
-  apiKey: getRequiredEnv("API_KEY"),
+  adminApiKey,
+  deviceKeyPepper,
+  exposeErrorDetails: parseBooleanEnv(process.env.EXPOSE_ERROR_DETAILS, false),
   defaultUtcOffsetMinutes: Number(process.env.DEFAULT_UTC_OFFSET_MINUTES || -180),
   defaultPollIntervalSeconds: Number(process.env.DEFAULT_POLL_INTERVAL_SECONDS || 60),
   mysql: {
