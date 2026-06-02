@@ -1,3 +1,4 @@
+const fs = require("fs");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -23,7 +24,50 @@ const config = {
     database: getRequiredEnv("MYSQL_DATABASE"),
     user: getRequiredEnv("MYSQL_USER"),
     password: process.env.MYSQL_PASSWORD || "",
+    sslEnabled: parseBooleanEnv(process.env.MYSQL_SSL_ENABLED, false),
+    sslRejectUnauthorized: parseBooleanEnv(process.env.MYSQL_SSL_REJECT_UNAUTHORIZED, true),
+    sslCa: readOptionalSslCa(),
   },
 };
 
 module.exports = { config };
+
+function parseBooleanEnv(value, fallback) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return fallback;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Invalid boolean environment variable value: ${value}`);
+}
+
+function readOptionalSslCa() {
+  const inlineCa = normalizeOptionalMultiline(process.env.MYSQL_SSL_CA);
+  if (inlineCa) {
+    return inlineCa;
+  }
+
+  const caPath = process.env.MYSQL_SSL_CA_PATH?.trim();
+  if (!caPath) {
+    return null;
+  }
+
+  return fs.readFileSync(caPath, "utf8");
+}
+
+function normalizeOptionalMultiline(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.replace(/\\n/g, "\n");
+}

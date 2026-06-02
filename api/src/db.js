@@ -1,7 +1,7 @@
 const mysql = require("mysql2/promise");
 
 function createDatabasePool(mysqlConfig) {
-  return mysql.createPool({
+  const poolConfig = {
     host: mysqlConfig.host,
     port: mysqlConfig.port,
     database: mysqlConfig.database,
@@ -10,7 +10,20 @@ function createDatabasePool(mysqlConfig) {
     waitForConnections: true,
     connectionLimit: 10,
     namedPlaceholders: true,
-  });
+  };
+
+  if (mysqlConfig.sslEnabled) {
+    poolConfig.ssl = {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: mysqlConfig.sslRejectUnauthorized,
+    };
+
+    if (mysqlConfig.sslCa) {
+      poolConfig.ssl.ca = mysqlConfig.sslCa;
+    }
+  }
+
+  return mysql.createPool(poolConfig);
 }
 
 async function ensureDevice(pool, device) {

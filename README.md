@@ -96,6 +96,10 @@ Configure `.env` a partir de [.env.example](/C:/Users/Schenkel_Dell/Desktop/marc
 - `MYSQL_DATABASE`
 - `MYSQL_USER`
 - `MYSQL_PASSWORD`
+- `MYSQL_SSL_ENABLED`
+- `MYSQL_SSL_REJECT_UNAUTHORIZED`
+- `MYSQL_SSL_CA`
+- `MYSQL_SSL_CA_PATH`
 
 ### Rodando
 
@@ -151,6 +155,9 @@ Passo a passo:
    - `MYSQL_DATABASE`
    - `MYSQL_USER`
    - `MYSQL_PASSWORD`
+   - `MYSQL_SSL_ENABLED`
+   - `MYSQL_SSL_REJECT_UNAUTHORIZED`
+   - `MYSQL_SSL_CA`
 4. Garanta que o MySQL esteja hospedado fora da sua maquina e acessivel pela Vercel.
 5. Faça o deploy.
 
@@ -160,6 +167,27 @@ Observacoes importantes:
 - O `dashboard` e servido como arquivo estatico em `public/admin`, porque a Vercel ignora `express.static()` para assets do Express.
 - O endpoint final da API vira algo como `https://seu-projeto.vercel.app`
 - No firmware do D1 mini, troque `API_BASE_URL` para a URL publica da Vercel.
+
+### Aiven + Vercel
+
+Se o banco estiver no `Aiven`, o padrao recomendado e ativar TLS:
+
+```env
+MYSQL_HOST=seu-host.aivencloud.com
+MYSQL_PORT=12345
+MYSQL_DATABASE=defaultdb
+MYSQL_USER=avnadmin
+MYSQL_PASSWORD=sua-senha
+MYSQL_SSL_ENABLED=true
+MYSQL_SSL_REJECT_UNAUTHORIZED=true
+MYSQL_SSL_CA=-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----
+```
+
+Notas:
+
+- `MYSQL_SSL_CA` aceita o certificado CA em uma linha so, usando `\n` para quebrar linhas.
+- `MYSQL_SSL_CA_PATH` e util localmente se voce preferir apontar para um arquivo `.pem`.
+- Se voce quiser apenas validar a conexao rapidamente antes de configurar o CA, pode usar `MYSQL_SSL_REJECT_UNAUTHORIZED=false`, mas isso e menos seguro e nao deve ser o estado final.
 
 ## Rotas principais
 
