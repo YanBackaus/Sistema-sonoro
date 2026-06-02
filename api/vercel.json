@@ -6,10 +6,5 @@
       "source": "/admin",
       "destination": "/admin/index.html"
     }
-  ],
-  "functions": {
-    "index.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
