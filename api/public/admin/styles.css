@@ -228,8 +228,8 @@ h3 {
 
 .field-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .field-grid-wide {
@@ -245,9 +245,11 @@ select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  min-height: 56px;
+  padding: 16px 18px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
+  font-size: 1rem;
 }
 
 input:focus,
@@ -425,9 +427,9 @@ button:active {
 }
 
 .workspace-note {
-  max-width: 68ch;
+  max-width: 56ch;
   color: var(--muted);
-  line-height: 1.65;
+  line-height: 1.55;
 }
 
 .stat-strip {
@@ -486,7 +488,7 @@ button:active {
 
 .summary-list {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .summary-list div {
@@ -509,6 +511,7 @@ button:active {
 
 .summary-list dd {
   overflow-wrap: anywhere;
+  font-size: 1rem;
 }
 
 .day-grid {
@@ -550,6 +553,7 @@ button:active {
   align-items: center;
   gap: 10px;
   font-weight: 700;
+  line-height: 1.5;
 }
 
 .toggle input {
@@ -568,7 +572,7 @@ button:active {
 
 .history-note {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .flash-message {
@@ -764,6 +768,12 @@ button:active {
   .schedule-main {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  input,
+  select {
+    min-height: 54px;
+    padding: 15px 16px;
   }
 
   .schedule-actions {

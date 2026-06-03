@@ -7,19 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/styles.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="page-shell">
     <header class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">D1 mini scheduler</p>
-        <h1>Gerencie horarios sonoros sem depender de Postman</h1>
-        <p class="hero-text">
-          Cadastre devices, registre novos horarios, edite o que mudou, ative ou
-          desative quando precisar e apague o que nao faz mais sentido, tudo em um
-          painel simples ligado direto na API da agenda sonora.
-        </p>
+        <p class="eyebrow">Painel</p>
+        <h1>Gerencie horarios</h1>
+        <p class="hero-text">Ajuste os ESPs e os toques em um so lugar.</p>
       </div>
 
       <div class="hero-panel surface">
@@ -43,7 +39,7 @@
           <input
             id="apiKeyInput"
             type="password"
-            placeholder="Digite a chave admin da API"
+            placeholder="Chave admin"
             autocomplete="off"
           >
         </label>
@@ -54,8 +50,7 @@
         </div>
 
         <p class="hint" id="configHint">
-          Abra este painel em <code>/admin</code>, informe a chave da API e gerencie os horarios
-          dos D1 mini pela mesma rede.
+          Informe a chave da API para continuar.
         </p>
       </div>
     </header>
@@ -64,29 +59,29 @@
       <aside class="surface device-rail reveal">
         <div class="section-head">
           <div>
-            <p class="section-kicker">ESP cadastrados</p>
-            <h2>Mapa rapido da frota</h2>
+            <p class="section-kicker">ESPs</p>
+            <h2>Lista de ESPs</h2>
           </div>
           <span class="live-dot-wrap">
             <span class="live-dot"></span>
-            <span id="deviceStatusText">Sem conexao ainda</span>
+            <span id="deviceStatusText">Aguardando conexao</span>
           </span>
         </div>
 
         <label class="field">
-          <span>Filtrar por nome ou ID</span>
+          <span>Buscar ESP</span>
           <input id="deviceSearchInput" type="text" placeholder="Ex.: corredor" autocomplete="off">
         </label>
 
         <label class="field compact-select">
-          <span>Selecionar no modo compacto</span>
+          <span>Escolher ESP</span>
           <select id="deviceSelect">
-            <option value="">Conecte para carregar</option>
+            <option value="">Conecte para ver</option>
           </select>
         </label>
 
         <div class="device-card-list" id="deviceCardList">
-          <div class="empty-state">Conecte a API para listar os ESPs cadastrados.</div>
+          <div class="empty-state">Conecte a API para ver os ESPs.</div>
         </div>
       </aside>
 
@@ -97,7 +92,7 @@
               <p class="section-kicker">Agenda independente</p>
               <h2 id="selectedDeviceHeading">Selecione um ESP</h2>
               <p class="workspace-note" id="selectedDeviceContext">
-                Cada agenda fica isolada no ESP selecionado. Criar, editar ou apagar horarios aqui nao afeta os demais.
+                Escolha um ESP para ver e editar os horarios dele.
               </p>
             </div>
             <span class="editor-badge" id="workspaceScopeBadge">Sem device</span>
@@ -127,8 +122,8 @@
           <article class="surface panel-card reveal">
             <div class="section-head">
               <div>
-                <p class="section-kicker">Cadastro e identidade</p>
-                <h2>Configurar este ESP</h2>
+                <p class="section-kicker">Dados do ESP</p>
+                <h2>Informacoes basicas</h2>
               </div>
             </div>
 
@@ -140,7 +135,7 @@
                 </label>
 
                 <label class="field">
-                  <span>Nome visivel</span>
+                  <span>Nome</span>
                   <input id="deviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
                 </label>
               </div>
@@ -152,36 +147,36 @@
                 </label>
 
                 <label class="field">
-                  <span>Titulo do menu</span>
+                  <span>Menu</span>
                   <input id="deviceMenuTitleInput" type="text" placeholder="Corredor" autocomplete="off">
                 </label>
               </div>
 
               <label class="field">
-                <span>Chave do device (opcional)</span>
+                <span>Nova chave (opcional)</span>
                 <input
                   id="deviceApiKeyInput"
                   type="password"
-                  placeholder="Deixe vazio para manter a atual ou gerar a primeira"
+                  placeholder="Deixe vazio para manter a atual"
                   autocomplete="off"
                 >
               </label>
 
               <label class="toggle">
                 <input id="rotateDeviceApiKeyInput" type="checkbox">
-                <span>Gerar uma nova chave do device ao salvar</span>
+                <span>Gerar chave nova ao salvar</span>
               </label>
 
               <p class="hint">
-                Cada placa usa sua propria chave. A chave admin do painel nunca vai para o firmware.
+                Cada ESP usa sua propria chave. A chave do painel nao vai para a placa.
               </p>
 
               <div class="provisioning-panel" id="deviceProvisioningPanel" hidden>
-                <p class="section-kicker">Provisionamento</p>
-                <strong>Chave pronta para gravar no firmware</strong>
+                <p class="section-kicker">Chave do ESP</p>
+                <strong>Use esta chave no firmware</strong>
                 <code id="deviceProvisioningValue" class="provisioning-value"></code>
                 <p class="hint">
-                  Guarde esta chave agora. Por seguranca ela so aparece quando for criada, definida manualmente ou rotacionada.
+                  Guarde agora. Ela so aparece quando for criada ou trocada.
                 </p>
               </div>
 
@@ -267,8 +262,8 @@
         <section class="surface panel-card reveal summary-panel">
           <div class="section-head">
             <div>
-              <p class="section-kicker">Resumo tecnico</p>
-              <h2>Saude do ESP selecionado</h2>
+              <p class="section-kicker">Resumo do ESP</p>
+              <h2>Dados rapidos</h2>
             </div>
           </div>
 
@@ -282,11 +277,11 @@
               <dd id="summaryLocation">--</dd>
             </div>
             <div>
-              <dt>Ultimo heartbeat</dt>
+              <dt>Ultima conexao</dt>
               <dd id="summaryLastSeen">--</dd>
             </div>
             <div>
-              <dt>Som global</dt>
+              <dt>Som remoto</dt>
               <dd id="summarySoundEnabled">--</dd>
             </div>
             <div>
@@ -304,7 +299,7 @@
           <div class="section-head">
             <div>
               <p class="section-kicker">Agenda ativa</p>
-              <h2>Lista exclusiva do ESP selecionado</h2>
+              <h2>Horarios deste ESP</h2>
             </div>
             <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
           </div>
@@ -318,6 +313,6 @@
     </main>
   </div>
 
-  <script type="module" src="/admin/app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

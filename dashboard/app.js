@@ -102,7 +102,7 @@ function bootstrap() {
     refreshEverything();
   } else {
     setApiBadge("API: informe a chave", false);
-    setHint("Digite a chave admin da API para carregar os devices e os horarios.");
+    setHint("Informe a chave da API para continuar.");
   }
 }
 
@@ -112,7 +112,7 @@ async function handleConnect() {
 
   if (!state.apiKey) {
     setApiBadge("API: chave ausente", false);
-    setHint("A chave admin e obrigatoria para listar ou alterar horarios.");
+    setHint("A chave da API é obrigatória.");
     return;
   }
 
@@ -123,7 +123,7 @@ async function handleConnect() {
 async function refreshEverything() {
   try {
     clearDeviceProvisioning();
-    setLoadingState("Carregando devices...");
+    setLoadingState("Carregando ESPs...");
     const devicesResponse = await apiRequest("/api/devices");
     state.devices = Array.isArray(devicesResponse.devices) ? devicesResponse.devices : [];
 
@@ -136,7 +136,7 @@ async function refreshEverything() {
       renderSchedules([]);
       resetScheduleForm();
       setApiBadge("API: online", true);
-      setHint("Nenhum device cadastrado ainda. Use o formulario para registrar o primeiro.");
+      setHint("Nenhum ESP cadastrado.");
       return;
     }
 
@@ -149,9 +149,9 @@ async function refreshEverything() {
 
     await loadSelectedDevice();
     setApiBadge("API: online", true);
-    setHint("API conectada. Cada alteracao vale apenas para o ESP selecionado na coluna lateral.");
+    setHint("API conectada.");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel conectar na API.");
+    handleRequestFailure(error, "Não foi possível conectar à API.");
   }
 }
 
@@ -200,7 +200,7 @@ async function handleDeviceSave(event) {
       rotate_device_api_key: elements.rotateDeviceApiKeyInput.checked,
     };
 
-    setLoadingState("Salvando device...");
+    setLoadingState("Salvando ESP...");
     const response = await apiRequest("/api/devices", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -211,9 +211,9 @@ async function handleDeviceSave(event) {
 
     await refreshEverything();
     renderDeviceProvisioning(response.provisioning || null, savedDeviceId);
-    showFlash(`Device ${savedDeviceId} salvo com sucesso.`, "success");
+    showFlash(`ESP ${savedDeviceId} salvo com sucesso.`, "success");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel salvar o device.");
+    handleRequestFailure(error, "Não foi possível salvar o ESP.");
   }
 }
 
@@ -221,7 +221,7 @@ async function handleScheduleSave(event) {
   event.preventDefault();
 
   if (!state.selectedDeviceId) {
-    showFlash("Selecione ou cadastre um device antes de criar horarios.", "error");
+    showFlash("Selecione ou cadastre um ESP antes de criar horários.", "error");
     return;
   }
 
@@ -245,13 +245,13 @@ async function handleScheduleSave(event) {
     };
 
     if (state.editingScheduleId === null) {
-      setLoadingState("Criando horario...");
+      setLoadingState("Criando horário...");
       await apiRequest(`/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
     } else {
-      setLoadingState("Atualizando horario...");
+      setLoadingState("Atualizando horário...");
       await apiRequest(
         `/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(state.editingScheduleId)}`,
         {
@@ -263,16 +263,16 @@ async function handleScheduleSave(event) {
 
     await loadSelectedDevice();
     const successMessage = state.editingScheduleId === null
-      ? `Horario ${payload.label} cadastrado com sucesso.`
-      : `Horario ${payload.label} atualizado com sucesso.`;
+      ? `Horário ${payload.label} cadastrado com sucesso.`
+      : `Horário ${payload.label} atualizado com sucesso.`;
     resetScheduleForm();
     showFlash(successMessage, "success");
   } catch (error) {
     handleRequestFailure(
       error,
       state.editingScheduleId === null
-        ? "Nao foi possivel cadastrar o horario."
-        : "Nao foi possivel atualizar o horario."
+        ? "Não foi possível cadastrar o horário."
+        : "Não foi possível atualizar o horário."
     );
   }
 }
@@ -286,7 +286,7 @@ async function handleScheduleListClick(event) {
   const scheduleId = button.getAttribute("data-schedule-id");
   const action = button.getAttribute("data-action");
   const schedule = findScheduleById(scheduleId);
-  const scheduleLabel = schedule?.label || button.getAttribute("data-schedule-label") || "este horario";
+  const scheduleLabel = schedule?.label || button.getAttribute("data-schedule-label") || "este horário";
 
   if (!scheduleId || !schedule) {
     return;
@@ -317,7 +317,7 @@ async function handleScheduleListClick(event) {
   }
 
   try {
-    setLoadingState("Apagando horario...");
+    setLoadingState("Apagando horário...");
     await apiRequest(
       `/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(scheduleId)}`,
       {
@@ -327,9 +327,9 @@ async function handleScheduleListClick(event) {
 
     state.pendingDeleteScheduleId = null;
     await loadSelectedDevice();
-    showFlash(`Horario ${scheduleLabel} removido.`, "success");
+    showFlash(`Horário ${scheduleLabel} removido.`, "success");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel apagar o horario.");
+    handleRequestFailure(error, "Não foi possível apagar o horário.");
   }
 }
 
@@ -343,7 +343,7 @@ async function handleScheduleToggle(schedule) {
       elements.enabledInput.checked = nextEnabled;
     }
 
-    setLoadingState(nextEnabled ? "Ativando horario..." : "Desativando horario...");
+    setLoadingState(nextEnabled ? "Ativando horário..." : "Desativando horário...");
     await apiRequest(
       `/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(schedule.id)}/enabled`,
       {
@@ -355,12 +355,12 @@ async function handleScheduleToggle(schedule) {
     await loadSelectedDevice();
     showFlash(
       nextEnabled
-        ? `Horario ${schedule.label} ativado.`
-        : `Horario ${schedule.label} desativado.`,
+        ? `Horário ${schedule.label} ativado.`
+        : `Horário ${schedule.label} desativado.`,
       "success"
     );
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel alterar o estado do horario.");
+    handleRequestFailure(error, "Não foi possível alterar o estado do horário.");
   }
 }
 
@@ -368,7 +368,7 @@ async function loadSelectedDevice() {
   if (!state.selectedDeviceId) {
     renderDeviceSummary(null);
     renderSchedules([]);
-    elements.deviceStatusText.textContent = "Nenhum device selecionado";
+    elements.deviceStatusText.textContent = "Nenhum ESP selecionado";
     return;
   }
 
@@ -402,10 +402,10 @@ async function loadSelectedDevice() {
 
     if (device) {
       fillDeviceForm(device);
-      elements.deviceStatusText.textContent = `Device ativo: ${device.device_id}`;
+      elements.deviceStatusText.textContent = `ESP ativo: ${device.device_id}`;
     }
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel carregar o device selecionado.");
+    handleRequestFailure(error, "Não foi possível carregar o ESP selecionado.");
   }
 }
 
@@ -420,7 +420,7 @@ function fillDeviceForm(device) {
 
 function renderDeviceOptions() {
   if (!state.devices.length) {
-    elements.deviceSelect.innerHTML = '<option value="">Nenhum device cadastrado</option>';
+    elements.deviceSelect.innerHTML = '<option value="">Nenhum ESP cadastrado</option>';
     return;
   }
 
@@ -438,7 +438,7 @@ function renderDeviceOptions() {
 function renderDeviceCards() {
   if (!state.devices.length) {
     elements.deviceCardList.innerHTML =
-      '<div class="empty-state">Nenhum ESP cadastrado ainda. Crie o primeiro no formulario ao lado.</div>';
+      '<div class="empty-state">Nenhum ESP cadastrado.</div>';
     return;
   }
 
@@ -458,7 +458,7 @@ function renderDeviceCards() {
 
   if (!visibleDevices.length) {
     elements.deviceCardList.innerHTML =
-      '<div class="empty-state">Nenhum ESP combina com esse filtro.</div>';
+      '<div class="empty-state">Nenhum ESP encontrado.</div>';
     return;
   }
 
@@ -501,8 +501,8 @@ function renderDeviceSummary(device) {
   if (!device) {
     elements.selectedDeviceHeading.textContent = "Selecione um ESP";
     elements.selectedDeviceContext.textContent =
-      "Cada agenda fica isolada no ESP selecionado. Criar, editar ou apagar horarios aqui nao afeta os demais.";
-    elements.workspaceScopeBadge.textContent = "Sem device";
+      "Escolha um ESP para ver os horários dele.";
+    elements.workspaceScopeBadge.textContent = "Sem ESP";
     elements.summaryName.textContent = "--";
     elements.summaryLocation.textContent = "--";
     elements.summaryLastSeen.textContent = "--";
@@ -524,7 +524,7 @@ function renderDeviceSummary(device) {
 
   elements.selectedDeviceHeading.textContent = device.menu_title || device.name || device.device_id;
   elements.selectedDeviceContext.textContent =
-    `Voce esta editando somente a agenda do ${device.device_id}. Todos os horarios abaixo pertencem apenas a este ESP.`;
+    `${device.device_id} selecionado. Os horários abaixo são só dele.`;
   elements.workspaceScopeBadge.textContent = device.device_id;
   elements.summaryName.textContent = device?.name || "--";
   elements.summaryLocation.textContent = device?.location || "--";
@@ -540,10 +540,10 @@ function renderDeviceSummary(device) {
 
 function renderSchedules(schedules) {
   state.schedules = schedules;
-  const deviceLabel = state.selectedDeviceId || "este device";
+  const deviceLabel = state.selectedDeviceId || "este ESP";
   elements.scheduleCountNote.textContent = schedules.length
-    ? `${schedules.length} horario(s) carregado(s) para ${deviceLabel}.`
-    : `Nenhum horario cadastrado para ${deviceLabel}.`;
+    ? `${schedules.length} horário(s) neste ESP.`
+    : `Nenhum horário cadastrado para ${deviceLabel}.`;
 
   if (
     state.pendingDeleteScheduleId &&
@@ -560,7 +560,7 @@ function renderSchedules(schedules) {
   }
 
   if (!schedules.length) {
-    elements.scheduleList.innerHTML = '<div class="empty-state">Ainda nao existe horario para este device.</div>';
+    elements.scheduleList.innerHTML = '<div class="empty-state">Ainda não existe horário para este ESP.</div>';
     return;
   }
 
@@ -678,12 +678,12 @@ function syncScheduleEditorUi(schedule = null) {
   const currentSchedule = schedule || findScheduleById(state.editingScheduleId);
   const deviceLabel = state.selectedDeviceId || "ESP selecionado";
 
-  elements.scheduleFormKicker.textContent = isEditing ? "Editar horario" : "Novo horario";
+  elements.scheduleFormKicker.textContent = isEditing ? "Editar horário" : "Novo horário";
   elements.scheduleFormTitle.textContent = isEditing
-    ? `Atualize o horario do ${deviceLabel}`
-    : `Cadastro rapido para ${deviceLabel}`;
-  elements.saveScheduleButton.textContent = isEditing ? "Salvar alteracoes" : "Cadastrar horario";
-  elements.resetScheduleButton.textContent = isEditing ? "Cancelar edicao" : "Limpar";
+    ? `Horário do ${deviceLabel}`
+    : `Novo horário para ${deviceLabel}`;
+  elements.saveScheduleButton.textContent = isEditing ? "Salvar alterações" : "Cadastrar horário";
+  elements.resetScheduleButton.textContent = isEditing ? "Cancelar edição" : "Limpar";
   elements.scheduleEditorBadge.hidden = false;
   elements.scheduleEditorBadge.textContent = isEditing
     ? `Editando #${currentSchedule?.id ?? state.editingScheduleId}`
@@ -731,7 +731,7 @@ function handleRequestFailure(error, fallbackMessage) {
   console.error(error);
   const message = error?.message || fallbackMessage;
   setApiBadge("API: erro", false);
-  elements.deviceStatusText.textContent = "Falha de comunicacao";
+  elements.deviceStatusText.textContent = "Falha de comunicação";
   setHint(message);
   showFlash(message, "error");
 }
@@ -746,7 +746,7 @@ async function apiRequest(path, options = {}) {
   hideFlash();
 
   if (!state.apiKey) {
-    throw new Error("API Key ausente.");
+    throw new Error("Chave da API ausente.");
   }
 
   const response = await fetch(`${state.apiBaseUrl}${path}`, {
@@ -907,7 +907,7 @@ function renderDeviceProvisioning(provisioning, deviceId) {
   elements.deviceProvisioningPanel.hidden = false;
   elements.deviceProvisioningValue.textContent = provisioning.device_api_key;
   setHint(
-    `Nova chave do device ${deviceId} pronta. Grave-a no firmware como DEVICE_API_KEY e guarde-a fora do navegador.`
+    `Nova chave do ESP ${deviceId} pronta. Grave-a no firmware como DEVICE_API_KEY e guarde-a fora do navegador.`
   );
 }
 

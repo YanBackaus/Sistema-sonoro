@@ -102,7 +102,7 @@ function bootstrap() {
     refreshEverything();
   } else {
     setApiBadge("API: informe a chave", false);
-    setHint("Digite a chave admin da API para carregar os devices e os horarios.");
+    setHint("Informe a chave da API para continuar.");
   }
 }
 
@@ -112,7 +112,7 @@ async function handleConnect() {
 
   if (!state.apiKey) {
     setApiBadge("API: chave ausente", false);
-    setHint("A chave admin e obrigatoria para listar ou alterar horarios.");
+    setHint("A chave da API e obrigatoria.");
     return;
   }
 
@@ -136,7 +136,7 @@ async function refreshEverything() {
       renderSchedules([]);
       resetScheduleForm();
       setApiBadge("API: online", true);
-      setHint("Nenhum device cadastrado ainda. Use o formulario para registrar o primeiro.");
+      setHint("Nenhum ESP cadastrado ainda.");
       return;
     }
 
@@ -149,7 +149,7 @@ async function refreshEverything() {
 
     await loadSelectedDevice();
     setApiBadge("API: online", true);
-    setHint("API conectada. Cada alteracao vale apenas para o ESP selecionado na coluna lateral.");
+    setHint("API conectada.");
   } catch (error) {
     handleRequestFailure(error, "Nao foi possivel conectar na API.");
   }
@@ -368,7 +368,7 @@ async function loadSelectedDevice() {
   if (!state.selectedDeviceId) {
     renderDeviceSummary(null);
     renderSchedules([]);
-    elements.deviceStatusText.textContent = "Nenhum device selecionado";
+    elements.deviceStatusText.textContent = "Nenhum ESP selecionado";
     return;
   }
 
@@ -420,7 +420,7 @@ function fillDeviceForm(device) {
 
 function renderDeviceOptions() {
   if (!state.devices.length) {
-    elements.deviceSelect.innerHTML = '<option value="">Nenhum device cadastrado</option>';
+    elements.deviceSelect.innerHTML = '<option value="">Nenhum ESP cadastrado</option>';
     return;
   }
 
@@ -438,7 +438,7 @@ function renderDeviceOptions() {
 function renderDeviceCards() {
   if (!state.devices.length) {
     elements.deviceCardList.innerHTML =
-      '<div class="empty-state">Nenhum ESP cadastrado ainda. Crie o primeiro no formulario ao lado.</div>';
+      '<div class="empty-state">Nenhum ESP cadastrado.</div>';
     return;
   }
 
@@ -458,7 +458,7 @@ function renderDeviceCards() {
 
   if (!visibleDevices.length) {
     elements.deviceCardList.innerHTML =
-      '<div class="empty-state">Nenhum ESP combina com esse filtro.</div>';
+      '<div class="empty-state">Nenhum ESP encontrado.</div>';
     return;
   }
 
@@ -501,7 +501,7 @@ function renderDeviceSummary(device) {
   if (!device) {
     elements.selectedDeviceHeading.textContent = "Selecione um ESP";
     elements.selectedDeviceContext.textContent =
-      "Cada agenda fica isolada no ESP selecionado. Criar, editar ou apagar horarios aqui nao afeta os demais.";
+      "Escolha um ESP para ver os horarios dele.";
     elements.workspaceScopeBadge.textContent = "Sem device";
     elements.summaryName.textContent = "--";
     elements.summaryLocation.textContent = "--";
@@ -524,7 +524,7 @@ function renderDeviceSummary(device) {
 
   elements.selectedDeviceHeading.textContent = device.menu_title || device.name || device.device_id;
   elements.selectedDeviceContext.textContent =
-    `Voce esta editando somente a agenda do ${device.device_id}. Todos os horarios abaixo pertencem apenas a este ESP.`;
+    `${device.device_id} selecionado. Os horarios abaixo sao so dele.`;
   elements.workspaceScopeBadge.textContent = device.device_id;
   elements.summaryName.textContent = device?.name || "--";
   elements.summaryLocation.textContent = device?.location || "--";
@@ -542,7 +542,7 @@ function renderSchedules(schedules) {
   state.schedules = schedules;
   const deviceLabel = state.selectedDeviceId || "este device";
   elements.scheduleCountNote.textContent = schedules.length
-    ? `${schedules.length} horario(s) carregado(s) para ${deviceLabel}.`
+    ? `${schedules.length} horario(s) neste ESP.`
     : `Nenhum horario cadastrado para ${deviceLabel}.`;
 
   if (
@@ -680,8 +680,8 @@ function syncScheduleEditorUi(schedule = null) {
 
   elements.scheduleFormKicker.textContent = isEditing ? "Editar horario" : "Novo horario";
   elements.scheduleFormTitle.textContent = isEditing
-    ? `Atualize o horario do ${deviceLabel}`
-    : `Cadastro rapido para ${deviceLabel}`;
+    ? `Horario do ${deviceLabel}`
+    : `Novo horario para ${deviceLabel}`;
   elements.saveScheduleButton.textContent = isEditing ? "Salvar alteracoes" : "Cadastrar horario";
   elements.resetScheduleButton.textContent = isEditing ? "Cancelar edicao" : "Limpar";
   elements.scheduleEditorBadge.hidden = false;
