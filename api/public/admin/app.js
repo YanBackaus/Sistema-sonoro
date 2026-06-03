@@ -8,6 +8,7 @@ const state = {
   apiBaseUrl: "",
   apiKey: "",
   devices: [],
+  deviceSearchTerm: "",
   editingScheduleId: null,
   pendingDeleteScheduleId: null,
   selectedDeviceId: "",
@@ -21,6 +22,7 @@ const elements = {
   browserBadge: document.querySelector("#browserBadge"),
   configHint: document.querySelector("#configHint"),
   connectButton: document.querySelector("#connectButton"),
+  deviceCardList: document.querySelector("#deviceCardList"),
   deviceApiKeyInput: document.querySelector("#deviceApiKeyInput"),
   deviceForm: document.querySelector("#deviceForm"),
   deviceIdInput: document.querySelector("#deviceIdInput"),
@@ -29,6 +31,7 @@ const elements = {
   deviceNameInput: document.querySelector("#deviceNameInput"),
   deviceProvisioningPanel: document.querySelector("#deviceProvisioningPanel"),
   deviceProvisioningValue: document.querySelector("#deviceProvisioningValue"),
+  deviceSearchInput: document.querySelector("#deviceSearchInput"),
   deviceSelect: document.querySelector("#deviceSelect"),
   deviceStatusText: document.querySelector("#deviceStatusText"),
   enabledInput: document.querySelector("#enabledInput"),
@@ -48,15 +51,21 @@ const elements = {
   scheduleMinuteInput: document.querySelector("#scheduleMinuteInput"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
   summaryActiveSchedules: document.querySelector("#summaryActiveSchedules"),
+  summaryConnectionStatus: document.querySelector("#summaryConnectionStatus"),
   summaryDeviceKey: document.querySelector("#summaryDeviceKey"),
   summaryLastSeen: document.querySelector("#summaryLastSeen"),
   summaryLocalSound: document.querySelector("#summaryLocalSound"),
   summaryLocation: document.querySelector("#summaryLocation"),
   summaryName: document.querySelector("#summaryName"),
+  summaryNextAlarm: document.querySelector("#summaryNextAlarm"),
   summarySoundEnabled: document.querySelector("#summarySoundEnabled"),
+  summaryTotalSchedules: document.querySelector("#summaryTotalSchedules"),
+  selectedDeviceContext: document.querySelector("#selectedDeviceContext"),
+  selectedDeviceHeading: document.querySelector("#selectedDeviceHeading"),
   toneHzInput: document.querySelector("#toneHzInput"),
   toneMsInput: document.querySelector("#toneMsInput"),
   rotateDeviceApiKeyInput: document.querySelector("#rotateDeviceApiKeyInput"),
+  workspaceScopeBadge: document.querySelector("#workspaceScopeBadge"),
 };
 
 bootstrap();
@@ -81,10 +90,12 @@ function bootstrap() {
   elements.connectButton.addEventListener("click", handleConnect);
   elements.refreshButton.addEventListener("click", refreshEverything);
   elements.deviceSelect.addEventListener("change", handleDeviceSelection);
+  elements.deviceSearchInput.addEventListener("input", handleDeviceSearch);
   elements.deviceForm.addEventListener("submit", handleDeviceSave);
   elements.scheduleForm.addEventListener("submit", handleScheduleSave);
   elements.resetScheduleButton.addEventListener("click", resetScheduleForm);
   elements.scheduleList.addEventListener("click", handleScheduleListClick);
+  elements.deviceCardList.addEventListener("click", handleDeviceCardClick);
   syncScheduleEditorUi();
 
   if (state.apiKey) {
@@ -101,7 +112,7 @@ async function handleConnect() {
 
   if (!state.apiKey) {
     setApiBadge("API: chave ausente", false);
-    setHint("A API Key e obrigatoria para listar ou alterar horarios.");
+    setHint("A chave admin e obrigatoria para listar ou alterar horarios.");
     return;
   }
 
@@ -117,6 +128,7 @@ async function refreshEverything() {
     state.devices = Array.isArray(devicesResponse.devices) ? devicesResponse.devices : [];
 
     renderDeviceOptions();
+    renderDeviceCards();
 
     if (!state.devices.length) {
       state.selectedDeviceId = "";
@@ -133,10 +145,11 @@ async function refreshEverything() {
     }
 
     elements.deviceSelect.value = state.selectedDeviceId;
+    renderDeviceCards();
 
     await loadSelectedDevice();
     setApiBadge("API: online", true);
-    setHint("API conectada. Voce pode cadastrar, editar, ativar, desativar ou apagar horarios.");
+    setHint("API conectada. Cada alteracao vale apenas para o ESP selecionado na coluna lateral.");
   } catch (error) {
     handleRequestFailure(error, "Nao foi possivel conectar na API.");
   }
@@ -146,6 +159,31 @@ async function handleDeviceSelection(event) {
   resetScheduleForm();
   clearDeviceProvisioning();
   state.selectedDeviceId = event.target.value;
+  renderDeviceCards();
+  await loadSelectedDevice();
+}
+
+function handleDeviceSearch(event) {
+  state.deviceSearchTerm = String(event.target.value || "").trim().toLowerCase();
+  renderDeviceCards();
+}
+
+async function handleDeviceCardClick(event) {
+  const button = event.target.closest("[data-device-id]");
+  if (!button) {
+    return;
+  }
+
+  const deviceId = button.getAttribute("data-device-id");
+  if (!deviceId || deviceId === state.selectedDeviceId) {
+    return;
+  }
+
+  resetScheduleForm();
+  clearDeviceProvisioning();
+  state.selectedDeviceId = deviceId;
+  elements.deviceSelect.value = deviceId;
+  renderDeviceCards();
   await loadSelectedDevice();
 }
 
@@ -214,10 +252,13 @@ async function handleScheduleSave(event) {
       });
     } else {
       setLoadingState("Atualizando horario...");
-      await apiRequest(`/api/schedules/${encodeURIComponent(state.editingScheduleId)}`, {
+      await apiRequest(
+        `/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(state.editingScheduleId)}`,
+        {
         method: "PUT",
         body: JSON.stringify(payload),
-      });
+        }
+      );
     }
 
     await loadSelectedDevice();
@@ -277,9 +318,12 @@ async function handleScheduleListClick(event) {
 
   try {
     setLoadingState("Apagando horario...");
-    await apiRequest(`/api/schedules/${encodeURIComponent(scheduleId)}`, {
+    await apiRequest(
+      `/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(scheduleId)}`,
+      {
       method: "DELETE",
-    });
+      }
+    );
 
     state.pendingDeleteScheduleId = null;
     await loadSelectedDevice();
@@ -300,10 +344,13 @@ async function handleScheduleToggle(schedule) {
     }
 
     setLoadingState(nextEnabled ? "Ativando horario..." : "Desativando horario...");
-    await apiRequest(`/api/schedules/${encodeURIComponent(schedule.id)}/enabled`, {
+    await apiRequest(
+      `/api/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(schedule.id)}/enabled`,
+      {
       method: "PATCH",
       body: JSON.stringify({ enabled: nextEnabled }),
-    });
+      }
+    );
 
     await loadSelectedDevice();
     showFlash(
@@ -335,6 +382,20 @@ async function loadSelectedDevice() {
 
     const device = deviceResponse.device || null;
     const schedules = Array.isArray(schedulesResponse.schedules) ? schedulesResponse.schedules : [];
+
+    if (device) {
+      const index = state.devices.findIndex((item) => item.device_id === device.device_id);
+      if (index >= 0) {
+        state.devices[index] = {
+          ...state.devices[index],
+          ...device,
+          active_schedule_count: schedules.filter((item) => item.enabled).length,
+        };
+        renderDeviceOptions();
+        elements.deviceSelect.value = state.selectedDeviceId;
+        renderDeviceCards();
+      }
+    }
 
     renderDeviceSummary(device);
     renderSchedules(schedules);
@@ -374,15 +435,104 @@ function renderDeviceOptions() {
     .join("");
 }
 
-function renderDeviceSummary(device) {
-  const activeScheduleCount = Array.isArray(device?.schedules)
-    ? device.schedules.filter((item) => item.enabled).length
-    : (device?.active_schedule_count ?? 0);
+function renderDeviceCards() {
+  if (!state.devices.length) {
+    elements.deviceCardList.innerHTML =
+      '<div class="empty-state">Nenhum ESP cadastrado ainda. Crie o primeiro no formulario ao lado.</div>';
+    return;
+  }
 
+  const searchTerm = state.deviceSearchTerm;
+  const visibleDevices = state.devices.filter((device) => {
+    if (!searchTerm) {
+      return true;
+    }
+
+    const haystack = [device.device_id, device.name, device.location]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(searchTerm);
+  });
+
+  if (!visibleDevices.length) {
+    elements.deviceCardList.innerHTML =
+      '<div class="empty-state">Nenhum ESP combina com esse filtro.</div>';
+    return;
+  }
+
+  elements.deviceCardList.innerHTML = visibleDevices
+    .map((device) => {
+      const isSelected = device.device_id === state.selectedDeviceId;
+      const statusLabel = inferDeviceOnline(device) ? "Online" : "Offline";
+      const subtitle = device.location || device.name || "Sem local";
+      const keyStatus = device.has_device_api_key
+        ? `Chave ...${device.device_api_key_last4 || "----"}`
+        : "Sem chave";
+
+      return `
+        <button
+          type="button"
+          class="device-card ${isSelected ? "device-card-selected" : ""}"
+          data-device-id="${escapeHtmlAttribute(device.device_id)}"
+        >
+          <div class="device-card-top">
+            <div>
+              <strong>${escapeHtml(device.device_id)}</strong>
+              <p>${escapeHtml(subtitle)}</p>
+            </div>
+            <span class="device-status ${inferDeviceOnline(device) ? "device-status-online" : "device-status-offline"}">
+              ${statusLabel}
+            </span>
+          </div>
+
+          <div class="device-card-meta">
+            <span>${device.active_schedule_count || 0} ativos</span>
+            <span>${keyStatus}</span>
+          </div>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderDeviceSummary(device) {
+  if (!device) {
+    elements.selectedDeviceHeading.textContent = "Selecione um ESP";
+    elements.selectedDeviceContext.textContent =
+      "Cada agenda fica isolada no ESP selecionado. Criar, editar ou apagar horarios aqui nao afeta os demais.";
+    elements.workspaceScopeBadge.textContent = "Sem device";
+    elements.summaryName.textContent = "--";
+    elements.summaryLocation.textContent = "--";
+    elements.summaryLastSeen.textContent = "--";
+    elements.summaryActiveSchedules.textContent = "--";
+    elements.summaryTotalSchedules.textContent = "--";
+    elements.summaryConnectionStatus.textContent = "--";
+    elements.summaryNextAlarm.textContent = "--";
+    elements.summarySoundEnabled.textContent = "--";
+    elements.summaryLocalSound.textContent = "--";
+    elements.summaryDeviceKey.textContent = "--";
+    return;
+  }
+
+  const schedules = Array.isArray(device.schedules) ? device.schedules : state.schedules;
+  const totalSchedules = schedules.length;
+  const activeScheduleCount = schedules.filter((item) => item.enabled).length;
+  const nextAlarm = findNextAlarmLabel(schedules);
+  const connectionStatus = inferDeviceOnline(device) ? "Online" : "Offline";
+
+  elements.selectedDeviceHeading.textContent = device.menu_title || device.name || device.device_id;
+  elements.selectedDeviceContext.textContent =
+    `Voce esta editando somente a agenda do ${device.device_id}. Todos os horarios abaixo pertencem apenas a este ESP.`;
+  elements.workspaceScopeBadge.textContent = device.device_id;
   elements.summaryName.textContent = device?.name || "--";
   elements.summaryLocation.textContent = device?.location || "--";
   elements.summaryLastSeen.textContent = formatDateTime(device?.last_seen_at);
   elements.summaryActiveSchedules.textContent = String(activeScheduleCount);
+  elements.summaryTotalSchedules.textContent = String(totalSchedules);
+  elements.summaryConnectionStatus.textContent = connectionStatus;
+  elements.summaryNextAlarm.textContent = nextAlarm;
   elements.summarySoundEnabled.textContent = formatBoolean(device?.sound_enabled);
   elements.summaryLocalSound.textContent = formatBoolean(device?.local_sound_enabled);
   elements.summaryDeviceKey.textContent = formatDeviceKeyStatus(device);
@@ -390,9 +540,10 @@ function renderDeviceSummary(device) {
 
 function renderSchedules(schedules) {
   state.schedules = schedules;
+  const deviceLabel = state.selectedDeviceId || "este device";
   elements.scheduleCountNote.textContent = schedules.length
-    ? `${schedules.length} horario(s) carregado(s).`
-    : "Nenhum horario cadastrado para este device.";
+    ? `${schedules.length} horario(s) carregado(s) para ${deviceLabel}.`
+    : `Nenhum horario cadastrado para ${deviceLabel}.`;
 
   if (
     state.pendingDeleteScheduleId &&
@@ -525,9 +676,12 @@ function startEditingSchedule(schedule) {
 function syncScheduleEditorUi(schedule = null) {
   const isEditing = state.editingScheduleId !== null;
   const currentSchedule = schedule || findScheduleById(state.editingScheduleId);
+  const deviceLabel = state.selectedDeviceId || "ESP selecionado";
 
   elements.scheduleFormKicker.textContent = isEditing ? "Editar horario" : "Novo horario";
-  elements.scheduleFormTitle.textContent = isEditing ? "Atualize o horario selecionado" : "Cadastro rapido";
+  elements.scheduleFormTitle.textContent = isEditing
+    ? `Atualize o horario do ${deviceLabel}`
+    : `Cadastro rapido para ${deviceLabel}`;
   elements.saveScheduleButton.textContent = isEditing ? "Salvar alteracoes" : "Cadastrar horario";
   elements.resetScheduleButton.textContent = isEditing ? "Cancelar edicao" : "Limpar";
   elements.scheduleEditorBadge.hidden = false;
@@ -662,6 +816,72 @@ function formatBoolean(value) {
   }
 
   return "--";
+}
+
+function inferDeviceOnline(device) {
+  if (!device?.last_seen_at) {
+    return false;
+  }
+
+  const lastSeen = new Date(device.last_seen_at);
+  if (Number.isNaN(lastSeen.getTime())) {
+    return false;
+  }
+
+  const toleranceSeconds = Math.max(120, (device.poll_interval_seconds || 60) * 3);
+  return Date.now() - lastSeen.getTime() <= toleranceSeconds * 1000;
+}
+
+function findNextAlarmLabel(schedules) {
+  const next = findNextAlarmOccurrence(schedules);
+  if (!next) {
+    return "Sem agenda";
+  }
+
+  const dayLabel = DAY_LABELS[next.day];
+  const hour = String(next.hour).padStart(2, "0");
+  const minute = String(next.minute).padStart(2, "0");
+  return `${dayLabel} ${hour}:${minute}`;
+}
+
+function findNextAlarmOccurrence(schedules) {
+  if (!Array.isArray(schedules) || !schedules.length) {
+    return null;
+  }
+
+  const now = new Date();
+  const currentDay = now.getDay();
+  const currentMinuteOfDay = now.getHours() * 60 + now.getMinutes();
+  let best = null;
+
+  for (const schedule of schedules) {
+    if (!schedule?.enabled || !Array.isArray(schedule.days_of_week)) {
+      continue;
+    }
+
+    for (const day of schedule.days_of_week) {
+      const scheduleMinuteOfDay = Number(schedule.hour) * 60 + Number(schedule.minute);
+      let daysAhead = day - currentDay;
+      if (daysAhead < 0) {
+        daysAhead += 7;
+      }
+      if (daysAhead === 0 && scheduleMinuteOfDay <= currentMinuteOfDay) {
+        daysAhead = 7;
+      }
+
+      const score = daysAhead * 1440 + scheduleMinuteOfDay;
+      if (!best || score < best.score) {
+        best = {
+          score,
+          day,
+          hour: Number(schedule.hour),
+          minute: Number(schedule.minute),
+        };
+      }
+    }
+  }
+
+  return best;
 }
 
 function formatDeviceKeyStatus(device) {

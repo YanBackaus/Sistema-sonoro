@@ -302,9 +302,25 @@ Exemplo:
 
 `PUT /api/schedules/:scheduleId`
 
+Opcao com escopo estrito por device:
+
+`PUT /api/devices/:deviceId/schedules/:scheduleId`
+
+### Ativar ou desativar horario
+
+`PATCH /api/schedules/:scheduleId/enabled`
+
+Opcao com escopo estrito por device:
+
+`PATCH /api/devices/:deviceId/schedules/:scheduleId/enabled`
+
 ### Excluir horario
 
 `DELETE /api/schedules/:scheduleId`
+
+Opcao com escopo estrito por device:
+
+`DELETE /api/devices/:deviceId/schedules/:scheduleId`
 
 ## Painel web
 
@@ -318,10 +334,14 @@ O painel permite:
 - listar os devices cadastrados
 - cadastrar ou atualizar um device
 - gerar ou rotacionar a chave individual de cada device
+- visualizar a frota em cards com estado rapido por ESP
+- selecionar o ESP ativo pela lateral e trabalhar sempre em contexto
 - criar novos horarios
 - editar horarios existentes
 - ativar ou desativar um horario ja cadastrado
 - apagar horarios existentes
+
+O front agora deixa explicito qual ESP esta selecionado e trata a agenda como isolada por device.
 
 Se voce abrir o painel pela propria API em `/admin`, ele ja tenta usar o mesmo host automaticamente.
 

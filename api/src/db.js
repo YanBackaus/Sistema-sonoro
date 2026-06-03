@@ -254,7 +254,12 @@ async function createSchedule(pool, deviceId, schedule) {
   return getScheduleById(pool, result.insertId);
 }
 
-async function updateSchedule(pool, scheduleId, schedule) {
+async function updateSchedule(pool, scheduleId, schedule, deviceId = null) {
+  const current = await getScheduleById(pool, scheduleId);
+  if (!current || (deviceId && current.device_id !== deviceId)) {
+    return null;
+  }
+
   await pool.execute(
     `UPDATE device_schedules
     SET
@@ -285,7 +290,12 @@ async function updateSchedule(pool, scheduleId, schedule) {
   return getScheduleById(pool, scheduleId);
 }
 
-async function updateScheduleEnabled(pool, scheduleId, enabled) {
+async function updateScheduleEnabled(pool, scheduleId, enabled, deviceId = null) {
+  const current = await getScheduleById(pool, scheduleId);
+  if (!current || (deviceId && current.device_id !== deviceId)) {
+    return null;
+  }
+
   await pool.execute(
     `UPDATE device_schedules
     SET enabled = :enabled
@@ -299,9 +309,9 @@ async function updateScheduleEnabled(pool, scheduleId, enabled) {
   return getScheduleById(pool, scheduleId);
 }
 
-async function deleteSchedule(pool, scheduleId) {
+async function deleteSchedule(pool, scheduleId, deviceId = null) {
   const schedule = await getScheduleById(pool, scheduleId);
-  if (!schedule) {
+  if (!schedule || (deviceId && schedule.device_id !== deviceId)) {
     return null;
   }
 

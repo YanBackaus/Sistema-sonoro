@@ -60,89 +60,215 @@
       </div>
     </header>
 
-    <main class="layout">
-      <section class="two-up">
-        <article class="surface panel-card reveal">
+    <main class="layout workspace-layout">
+      <aside class="surface device-rail reveal">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">ESP cadastrados</p>
+            <h2>Mapa rapido da frota</h2>
+          </div>
+          <span class="live-dot-wrap">
+            <span class="live-dot"></span>
+            <span id="deviceStatusText">Sem conexao ainda</span>
+          </span>
+        </div>
+
+        <label class="field">
+          <span>Filtrar por nome ou ID</span>
+          <input id="deviceSearchInput" type="text" placeholder="Ex.: corredor" autocomplete="off">
+        </label>
+
+        <label class="field compact-select">
+          <span>Selecionar no modo compacto</span>
+          <select id="deviceSelect">
+            <option value="">Conecte para carregar</option>
+          </select>
+        </label>
+
+        <div class="device-card-list" id="deviceCardList">
+          <div class="empty-state">Conecte a API para listar os ESPs cadastrados.</div>
+        </div>
+      </aside>
+
+      <div class="workspace-stack">
+        <section class="surface workspace-hero reveal">
           <div class="section-head">
             <div>
-              <p class="section-kicker">Dispositivos</p>
-              <h2>Selecionar e cadastrar</h2>
-            </div>
-            <span class="live-dot-wrap">
-              <span class="live-dot"></span>
-              <span id="deviceStatusText">Sem conexao ainda</span>
-            </span>
-          </div>
-
-          <label class="field">
-            <span>Device atual</span>
-            <select id="deviceSelect">
-              <option value="">Conecte para carregar</option>
-            </select>
-          </label>
-
-          <form id="deviceForm" class="stack-form">
-            <div class="field-grid">
-              <label class="field">
-                <span>Device ID</span>
-                <input id="deviceIdInput" type="text" placeholder="d1mini_02" autocomplete="off" required>
-              </label>
-
-              <label class="field">
-                <span>Nome visivel</span>
-                <input id="deviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
-              </label>
-            </div>
-
-            <div class="field-grid">
-              <label class="field">
-                <span>Local</span>
-                <input id="deviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
-              </label>
-
-              <label class="field">
-                <span>Titulo do menu</span>
-                <input id="deviceMenuTitleInput" type="text" placeholder="Corredor" autocomplete="off">
-              </label>
-            </div>
-
-            <label class="field">
-              <span>Chave do device (opcional)</span>
-              <input
-                id="deviceApiKeyInput"
-                type="password"
-                placeholder="Deixe vazio para manter a atual ou gerar a primeira"
-                autocomplete="off"
-              >
-            </label>
-
-            <label class="toggle">
-              <input id="rotateDeviceApiKeyInput" type="checkbox">
-              <span>Gerar uma nova chave do device ao salvar</span>
-            </label>
-
-            <p class="hint">
-              Cada placa agora usa a propria chave no firmware. A chave admin do painel nao vai para o D1 mini.
-            </p>
-
-            <div class="provisioning-panel" id="deviceProvisioningPanel" hidden>
-              <p class="section-kicker">Provisionamento</p>
-              <strong>Chave pronta para gravar no firmware</strong>
-              <code id="deviceProvisioningValue" class="provisioning-value"></code>
-              <p class="hint">
-                Guarde esta chave agora. Por seguranca ela so aparece quando for criada, definida manualmente ou rotacionada.
+              <p class="section-kicker">Agenda independente</p>
+              <h2 id="selectedDeviceHeading">Selecione um ESP</h2>
+              <p class="workspace-note" id="selectedDeviceContext">
+                Cada agenda fica isolada no ESP selecionado. Criar, editar ou apagar horarios aqui nao afeta os demais.
               </p>
             </div>
+            <span class="editor-badge" id="workspaceScopeBadge">Sem device</span>
+          </div>
 
-            <button type="submit">Salvar device</button>
-          </form>
-        </article>
+          <div class="stat-strip">
+            <div class="stat-pill">
+              <span>Status</span>
+              <strong id="summaryConnectionStatus">--</strong>
+            </div>
+            <div class="stat-pill">
+              <span>Horarios totais</span>
+              <strong id="summaryTotalSchedules">--</strong>
+            </div>
+            <div class="stat-pill">
+              <span>Horarios ativos</span>
+              <strong id="summaryActiveSchedules">--</strong>
+            </div>
+            <div class="stat-pill">
+              <span>Proximo toque</span>
+              <strong id="summaryNextAlarm">--</strong>
+            </div>
+          </div>
+        </section>
 
-        <article class="surface panel-card reveal">
+        <section class="workspace-grid">
+          <article class="surface panel-card reveal">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Cadastro e identidade</p>
+                <h2>Configurar este ESP</h2>
+              </div>
+            </div>
+
+            <form id="deviceForm" class="stack-form">
+              <div class="field-grid">
+                <label class="field">
+                  <span>Device ID</span>
+                  <input id="deviceIdInput" type="text" placeholder="d1mini_02" autocomplete="off" required>
+                </label>
+
+                <label class="field">
+                  <span>Nome visivel</span>
+                  <input id="deviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
+                </label>
+              </div>
+
+              <div class="field-grid">
+                <label class="field">
+                  <span>Local</span>
+                  <input id="deviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
+                </label>
+
+                <label class="field">
+                  <span>Titulo do menu</span>
+                  <input id="deviceMenuTitleInput" type="text" placeholder="Corredor" autocomplete="off">
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Chave do device (opcional)</span>
+                <input
+                  id="deviceApiKeyInput"
+                  type="password"
+                  placeholder="Deixe vazio para manter a atual ou gerar a primeira"
+                  autocomplete="off"
+                >
+              </label>
+
+              <label class="toggle">
+                <input id="rotateDeviceApiKeyInput" type="checkbox">
+                <span>Gerar uma nova chave do device ao salvar</span>
+              </label>
+
+              <p class="hint">
+                Cada placa usa sua propria chave. A chave admin do painel nunca vai para o firmware.
+              </p>
+
+              <div class="provisioning-panel" id="deviceProvisioningPanel" hidden>
+                <p class="section-kicker">Provisionamento</p>
+                <strong>Chave pronta para gravar no firmware</strong>
+                <code id="deviceProvisioningValue" class="provisioning-value"></code>
+                <p class="hint">
+                  Guarde esta chave agora. Por seguranca ela so aparece quando for criada, definida manualmente ou rotacionada.
+                </p>
+              </div>
+
+              <button type="submit">Salvar device</button>
+            </form>
+          </article>
+
+          <article class="surface panel-card reveal">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker" id="scheduleFormKicker">Novo horario</p>
+                <h2 id="scheduleFormTitle">Cadastro rapido</h2>
+              </div>
+              <span class="editor-badge" id="scheduleEditorBadge" hidden>Criando</span>
+            </div>
+
+            <form id="scheduleForm" class="stack-form">
+              <div class="field-grid field-grid-wide">
+                <label class="field">
+                  <span>Descricao</span>
+                  <input id="scheduleLabelInput" type="text" placeholder="Entrada" autocomplete="off" required>
+                </label>
+
+                <label class="field">
+                  <span>Hora</span>
+                  <input id="scheduleHourInput" type="number" min="0" max="23" value="8" required>
+                </label>
+
+                <label class="field">
+                  <span>Minuto</span>
+                  <input id="scheduleMinuteInput" type="number" min="0" max="59" value="0" required>
+                </label>
+              </div>
+
+              <div class="field">
+                <span>Dias da semana</span>
+                <div class="day-grid" id="dayGrid">
+                  <label class="day-chip"><input type="checkbox" value="0"><span>Dom</span></label>
+                  <label class="day-chip"><input type="checkbox" value="1" checked><span>Seg</span></label>
+                  <label class="day-chip"><input type="checkbox" value="2" checked><span>Ter</span></label>
+                  <label class="day-chip"><input type="checkbox" value="3" checked><span>Qua</span></label>
+                  <label class="day-chip"><input type="checkbox" value="4" checked><span>Qui</span></label>
+                  <label class="day-chip"><input type="checkbox" value="5" checked><span>Sex</span></label>
+                  <label class="day-chip"><input type="checkbox" value="6"><span>Sab</span></label>
+                </div>
+              </div>
+
+              <div class="field-grid">
+                <label class="field">
+                  <span>Frequencia (Hz)</span>
+                  <input id="toneHzInput" type="number" min="100" max="6000" value="2400" required>
+                </label>
+
+                <label class="field">
+                  <span>Duracao (ms)</span>
+                  <input id="toneMsInput" type="number" min="50" max="10000" value="600" required>
+                </label>
+
+                <label class="field">
+                  <span>Repeticoes</span>
+                  <input id="repeatCountInput" type="number" min="1" max="10" value="1" required>
+                </label>
+
+                <label class="field">
+                  <span>Intervalo (ms)</span>
+                  <input id="repeatGapInput" type="number" min="0" max="10000" value="250" required>
+                </label>
+              </div>
+
+              <label class="toggle">
+                <input id="enabledInput" type="checkbox" checked>
+                <span>Horario ativo</span>
+              </label>
+
+              <div class="inline-actions">
+                <button id="saveScheduleButton" type="submit">Cadastrar horario</button>
+                <button id="resetScheduleButton" type="button" class="button-secondary">Limpar</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <section class="surface panel-card reveal summary-panel">
           <div class="section-head">
             <div>
-              <p class="section-kicker">Resumo</p>
-              <h2>Estado do device</h2>
+              <p class="section-kicker">Resumo tecnico</p>
+              <h2>Saude do ESP selecionado</h2>
             </div>
           </div>
 
@@ -160,10 +286,6 @@
               <dd id="summaryLastSeen">--</dd>
             </div>
             <div>
-              <dt>Horarios ativos</dt>
-              <dd id="summaryActiveSchedules">--</dd>
-            </div>
-            <div>
               <dt>Som global</dt>
               <dd id="summarySoundEnabled">--</dd>
             </div>
@@ -176,97 +298,23 @@
               <dd id="summaryDeviceKey">--</dd>
             </div>
           </dl>
-        </article>
-      </section>
+        </section>
 
-      <section class="surface panel-card reveal">
-        <div class="section-head">
-          <div>
-            <p class="section-kicker" id="scheduleFormKicker">Novo horario</p>
-            <h2 id="scheduleFormTitle">Cadastro rapido</h2>
-          </div>
-          <span class="editor-badge" id="scheduleEditorBadge" hidden>Criando</span>
-        </div>
-
-        <form id="scheduleForm" class="stack-form">
-          <div class="field-grid field-grid-wide">
-            <label class="field">
-              <span>Descricao</span>
-              <input id="scheduleLabelInput" type="text" placeholder="Entrada" autocomplete="off" required>
-            </label>
-
-            <label class="field">
-              <span>Hora</span>
-              <input id="scheduleHourInput" type="number" min="0" max="23" value="8" required>
-            </label>
-
-            <label class="field">
-              <span>Minuto</span>
-              <input id="scheduleMinuteInput" type="number" min="0" max="59" value="0" required>
-            </label>
-          </div>
-
-          <div class="field">
-            <span>Dias da semana</span>
-            <div class="day-grid" id="dayGrid">
-              <label class="day-chip"><input type="checkbox" value="0"><span>Dom</span></label>
-              <label class="day-chip"><input type="checkbox" value="1" checked><span>Seg</span></label>
-              <label class="day-chip"><input type="checkbox" value="2" checked><span>Ter</span></label>
-              <label class="day-chip"><input type="checkbox" value="3" checked><span>Qua</span></label>
-              <label class="day-chip"><input type="checkbox" value="4" checked><span>Qui</span></label>
-              <label class="day-chip"><input type="checkbox" value="5" checked><span>Sex</span></label>
-              <label class="day-chip"><input type="checkbox" value="6"><span>Sab</span></label>
+        <section class="surface history-panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Agenda ativa</p>
+              <h2>Lista exclusiva do ESP selecionado</h2>
             </div>
+            <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
           </div>
 
-          <div class="field-grid">
-            <label class="field">
-              <span>Frequencia (Hz)</span>
-              <input id="toneHzInput" type="number" min="100" max="6000" value="2400" required>
-            </label>
-
-            <label class="field">
-              <span>Duracao (ms)</span>
-              <input id="toneMsInput" type="number" min="50" max="10000" value="600" required>
-            </label>
-
-            <label class="field">
-              <span>Repeticoes</span>
-              <input id="repeatCountInput" type="number" min="1" max="10" value="1" required>
-            </label>
-
-            <label class="field">
-              <span>Intervalo (ms)</span>
-              <input id="repeatGapInput" type="number" min="0" max="10000" value="250" required>
-            </label>
+          <div id="flashMessage" class="flash-message" hidden></div>
+          <div class="history-list" id="scheduleList">
+            <div class="empty-state">Conecte a API para carregar os horarios.</div>
           </div>
-
-          <label class="toggle">
-            <input id="enabledInput" type="checkbox" checked>
-            <span>Horario ativo</span>
-          </label>
-
-          <div class="inline-actions">
-            <button id="saveScheduleButton" type="submit">Cadastrar horario</button>
-            <button id="resetScheduleButton" type="button" class="button-secondary">Limpar</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="surface history-panel reveal">
-        <div class="section-head">
-          <div>
-            <p class="section-kicker">Horarios atuais</p>
-            <h2>Lista do device selecionado</h2>
-          </div>
-          <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
-        </div>
-
-        <div id="flashMessage" class="flash-message" hidden></div>
-        <div class="history-list" id="scheduleList">
-          <div class="empty-state">Conecte a API para carregar os horarios.</div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   </div>
 

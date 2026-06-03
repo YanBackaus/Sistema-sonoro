@@ -62,6 +62,7 @@ app.get("/", (request, response) => {
       heartbeat: "POST /api/devices/:deviceId/heartbeat",
       deviceEvents: "POST /api/devices/:deviceId/events",
       schedules: "GET/POST /api/devices/:deviceId/schedules",
+      scheduleEdit: "PUT/PATCH/DELETE /api/devices/:deviceId/schedules/:scheduleId",
     },
   });
 });
@@ -251,6 +252,77 @@ app.post("/api/devices/:deviceId/schedules", requireAdminAccess, async (request,
     response.status(201).json({
       ok: true,
       schedule: saved,
+    });
+  } catch (error) {
+    handleApiError(error, response);
+  }
+});
+
+app.put("/api/devices/:deviceId/schedules/:scheduleId", requireAdminAccess, async (request, response) => {
+  try {
+    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+    const scheduleId = normalizeScheduleId(request.params.scheduleId);
+    const schedule = normalizeSchedulePayload(request.body || {});
+    const updated = await updateSchedule(pool, scheduleId, schedule, deviceId);
+
+    if (!updated) {
+      response.status(404).json({
+        ok: false,
+        error: "Schedule not found for this device.",
+      });
+      return;
+    }
+
+    response.json({
+      ok: true,
+      schedule: updated,
+    });
+  } catch (error) {
+    handleApiError(error, response);
+  }
+});
+
+app.patch("/api/devices/:deviceId/schedules/:scheduleId/enabled", requireAdminAccess, async (request, response) => {
+  try {
+    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+    const scheduleId = normalizeScheduleId(request.params.scheduleId);
+    const enabled = normalizeBoolean(request.body?.enabled);
+    const updated = await updateScheduleEnabled(pool, scheduleId, enabled, deviceId);
+
+    if (!updated) {
+      response.status(404).json({
+        ok: false,
+        error: "Schedule not found for this device.",
+      });
+      return;
+    }
+
+    response.json({
+      ok: true,
+      schedule: updated,
+    });
+  } catch (error) {
+    handleApiError(error, response);
+  }
+});
+
+app.delete("/api/devices/:deviceId/schedules/:scheduleId", requireAdminAccess, async (request, response) => {
+  try {
+    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+    const scheduleId = normalizeScheduleId(request.params.scheduleId);
+    const removed = await deleteSchedule(pool, scheduleId, deviceId);
+
+    if (!removed) {
+      response.status(404).json({
+        ok: false,
+        error: "Schedule not found for this device.",
+      });
+      return;
+    }
+
+    response.json({
+      ok: true,
+      schedule: removed,
     });
   } catch (error) {
     handleApiError(error, response);
