@@ -88,6 +88,45 @@ function normalizeEventPayload(payload) {
   };
 }
 
+function normalizeDeveloperPasswordPayload(payload) {
+  const password = normalizeString(payload.password, 256);
+  if (!password) {
+    throw new ValidationError("password is required.");
+  }
+
+  return { password };
+}
+
+function normalizeFirmwareReleasePayload(payload) {
+  const version = normalizeString(payload.version, 32);
+  if (!version) {
+    throw new ValidationError("version is required.");
+  }
+
+  const firmware_url = normalizeFirmwareUrl(payload.firmware_url);
+  if (!firmware_url) {
+    throw new ValidationError("firmware_url is required.");
+  }
+
+  return {
+    version,
+    channel: normalizeString(payload.channel, 32) || "stable",
+    firmware_url,
+    sha256: normalizeOptionalSha256(payload.sha256),
+    notes: normalizeString(payload.notes, 2000),
+  };
+}
+
+function normalizeFirmwareDeploymentPayload(payload) {
+  const deviceIds = Array.isArray(payload.device_ids)
+    ? [...new Set(payload.device_ids.map((item) => normalizeDeviceId(item, "device_ids")))]
+    : [];
+
+  return {
+    device_ids: deviceIds,
+  };
+}
+
 function normalizeScheduleId(value) {
   return normalizeInteger(value, 1, Number.MAX_SAFE_INTEGER);
 }
@@ -205,15 +244,52 @@ function normalizeOptionalDeviceApiKey(value) {
   return normalized;
 }
 
+function normalizeFirmwareUrl(value) {
+  const normalized = normalizeString(value, 255);
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.startsWith("/")) {
+    return normalized;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("invalid");
+    }
+    return parsed.toString();
+  } catch (error) {
+    throw new ValidationError("firmware_url must be an absolute http(s) URL or a site-relative path.");
+  }
+}
+
+function normalizeOptionalSha256(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new ValidationError("sha256 must contain 64 hexadecimal characters.");
+  }
+
+  return normalized;
+}
+
 class ValidationError extends Error {}
 
 module.exports = {
   ValidationError,
   normalizeDeviceId,
   normalizeDevicePayload,
+  normalizeDeveloperPasswordPayload,
   normalizeSchedulePayload,
   normalizeHeartbeatPayload,
   normalizeEventPayload,
+  normalizeFirmwareDeploymentPayload,
+  normalizeFirmwareReleasePayload,
   normalizeScheduleId,
   normalizeBoolean,
 };

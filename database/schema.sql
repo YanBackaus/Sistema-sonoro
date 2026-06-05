@@ -96,6 +96,41 @@ CREATE TABLE IF NOT EXISTS device_events (
       ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS firmware_releases (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    version VARCHAR(32) NOT NULL,
+    channel VARCHAR(32) NOT NULL DEFAULT 'stable',
+    firmware_url VARCHAR(255) NOT NULL,
+    sha256 CHAR(64) DEFAULT NULL,
+    notes TEXT DEFAULT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_firmware_release_version_channel (version, channel)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS device_firmware_deployments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    device_id VARCHAR(64) NOT NULL,
+    firmware_release_id BIGINT UNSIGNED NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    applied_at DATETIME DEFAULT NULL,
+    failed_at DATETIME DEFAULT NULL,
+    last_error VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_device_firmware_deployments_device_status (device_id, status, id),
+    KEY idx_device_firmware_deployments_release_status (firmware_release_id, status, id),
+    CONSTRAINT fk_device_firmware_deployments_device
+      FOREIGN KEY (device_id) REFERENCES devices(device_id)
+      ON DELETE CASCADE,
+    CONSTRAINT fk_device_firmware_deployments_release
+      FOREIGN KEY (firmware_release_id) REFERENCES firmware_releases(id)
+      ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS readings (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     device_id VARCHAR(64) NOT NULL,

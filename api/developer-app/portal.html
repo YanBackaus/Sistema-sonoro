@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal do Desenvolvedor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/developer/assets/styles.css">
+</head>
+<body class="developer-body">
+  <div class="developer-shell">
+    <header class="developer-hero">
+      <div>
+        <p class="eyebrow">Desenvolvedor</p>
+        <h1>Controle de firmware e ESPs</h1>
+        <p class="developer-copy">Gerencie os ESPs cadastrados e publique novas versoes de firmware por OTA.</p>
+      </div>
+      <div class="developer-toolbar">
+        <span class="developer-chip" id="developerSessionChip">Sessao ativa</span>
+        <button type="button" class="button-secondary" id="developerLogoutButton">Sair</button>
+      </div>
+    </header>
+
+    <section class="developer-stats" id="developerStats">
+      <article class="developer-stat-card">
+        <span>ESPs</span>
+        <strong id="statDevices">--</strong>
+      </article>
+      <article class="developer-stat-card">
+        <span>Online</span>
+        <strong id="statOnline">--</strong>
+      </article>
+      <article class="developer-stat-card">
+        <span>Releases</span>
+        <strong id="statReleases">--</strong>
+      </article>
+      <article class="developer-stat-card">
+        <span>Deploys pendentes</span>
+        <strong id="statPendingDeployments">--</strong>
+      </article>
+    </section>
+
+    <p class="developer-banner" id="developerBanner">Carregando dados...</p>
+
+    <main class="developer-grid">
+      <section class="developer-panel developer-panel-tall">
+        <div class="developer-panel-head">
+          <div>
+            <p class="section-kicker">ESPs cadastrados</p>
+            <h2>Dispositivos</h2>
+          </div>
+          <button type="button" class="button-secondary" id="developerRefreshButton">Atualizar</button>
+        </div>
+
+        <div class="developer-list" id="developerDeviceList">
+          <div class="empty-state">Nenhum ESP carregado.</div>
+        </div>
+      </section>
+
+      <section class="developer-panel">
+        <div class="developer-panel-head">
+          <div>
+            <p class="section-kicker">Editar ESP</p>
+            <h2 id="developerDeviceTitle">Novo ESP</h2>
+          </div>
+        </div>
+
+        <form id="developerDeviceForm" class="stack-form">
+          <div class="field-grid">
+            <label class="field">
+              <span>ID do ESP</span>
+              <input id="developerDeviceIdInput" type="text" placeholder="d1mini_03" autocomplete="off" required>
+            </label>
+            <label class="field">
+              <span>Nome</span>
+              <input id="developerDeviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Local</span>
+              <input id="developerDeviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Menu</span>
+              <input id="developerDeviceMenuInput" type="text" placeholder="Corredor" autocomplete="off">
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Fuso (min)</span>
+              <input id="developerDeviceUtcOffsetInput" type="number" value="-180">
+            </label>
+            <label class="field">
+              <span>Heartbeat (s)</span>
+              <input id="developerDevicePollInput" type="number" min="15" value="60">
+            </label>
+          </div>
+
+          <label class="toggle">
+            <input id="developerDeviceSoundInput" type="checkbox" checked>
+            <span>Som remoto ativado</span>
+          </label>
+
+          <label class="field">
+            <span>Nova chave do ESP (opcional)</span>
+            <input id="developerDeviceKeyInput" type="text" placeholder="Deixe em branco para manter">
+          </label>
+
+          <label class="toggle">
+            <input id="developerRotateKeyInput" type="checkbox">
+            <span>Gerar nova chave ao salvar</span>
+          </label>
+
+          <div class="developer-inline-actions">
+            <button type="submit">Salvar ESP</button>
+            <button type="button" class="button-secondary" id="developerDeviceResetButton">Limpar</button>
+            <button type="button" class="button-danger" id="developerDeviceDeleteButton" hidden>Excluir</button>
+          </div>
+
+          <div class="developer-note-card" id="developerProvisioningCard" hidden>
+            <strong>Chave pronta para o firmware</strong>
+            <code id="developerProvisioningValue"></code>
+          </div>
+        </form>
+      </section>
+
+      <section class="developer-panel">
+        <div class="developer-panel-head">
+          <div>
+            <p class="section-kicker">ESP selecionado</p>
+            <h2>Resumo e historico</h2>
+          </div>
+        </div>
+
+        <div class="developer-note-card developer-summary-card" id="developerDeviceSummary">
+          <strong>Nenhum ESP selecionado</strong>
+          <p>Escolha um dispositivo na lista para ver detalhes e deploys recentes.</p>
+        </div>
+
+        <div class="developer-release-list" id="developerDeploymentHistory">
+          <div class="empty-state">Nenhum deployment para mostrar.</div>
+        </div>
+      </section>
+
+      <section class="developer-panel developer-panel-wide">
+        <div class="developer-panel-head">
+          <div>
+            <p class="section-kicker">Firmware</p>
+            <h2>Nova release OTA</h2>
+          </div>
+        </div>
+
+        <form id="developerReleaseForm" class="stack-form">
+          <div class="field-grid">
+            <label class="field">
+              <span>Versao</span>
+              <input id="developerReleaseVersionInput" type="text" placeholder="1.0.1" autocomplete="off" required>
+            </label>
+            <label class="field">
+              <span>Canal</span>
+              <input id="developerReleaseChannelInput" type="text" placeholder="stable" value="stable" autocomplete="off">
+            </label>
+          </div>
+
+          <label class="field">
+            <span>URL do firmware</span>
+            <input id="developerReleaseUrlInput" type="text" placeholder="https://.../firmware.bin ou /firmware/d1mini.bin" autocomplete="off" required>
+          </label>
+
+          <label class="field">
+            <span>SHA-256 (opcional)</span>
+            <input id="developerReleaseShaInput" type="text" placeholder="Hash do binario para validacao" autocomplete="off">
+          </label>
+
+          <label class="field">
+            <span>Notas</span>
+            <textarea id="developerReleaseNotesInput" rows="4" placeholder="O que mudou nesta versao?"></textarea>
+          </label>
+
+          <button type="submit">Salvar release</button>
+        </form>
+      </section>
+
+      <section class="developer-panel developer-panel-wide">
+        <div class="developer-panel-head">
+          <div>
+            <p class="section-kicker">Deploy OTA</p>
+            <h2>Enviar firmware</h2>
+          </div>
+        </div>
+
+        <form id="developerDeploymentForm" class="stack-form">
+          <label class="field">
+            <span>Release</span>
+            <select id="developerReleaseSelect">
+              <option value="">Selecione uma release</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Destino</span>
+            <select id="developerDeployTargetSelect">
+              <option value="selected">ESP selecionado</option>
+              <option value="all">Todos os ESPs</option>
+            </select>
+          </label>
+
+          <button type="submit">Enviar atualizacao</button>
+        </form>
+
+        <div class="developer-release-list" id="developerReleaseList">
+          <div class="empty-state">Nenhuma release cadastrada.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/developer/assets/portal.js"></script>
+</body>
+</html>

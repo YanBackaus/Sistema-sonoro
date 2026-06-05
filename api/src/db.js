@@ -187,6 +187,19 @@ async function getDeviceConfig(pool, deviceId) {
   return getDeviceDetails(pool, deviceId);
 }
 
+async function deleteDeviceById(pool, deviceId) {
+  const existing = await getDeviceDetails(pool, deviceId);
+  if (!existing) {
+    return null;
+  }
+
+  await pool.execute("DELETE FROM devices WHERE device_id = :device_id", {
+    device_id: deviceId,
+  });
+
+  return existing;
+}
+
 async function listSchedulesForDevice(pool, deviceId) {
   const [rows] = await pool.execute(
     `SELECT
@@ -400,6 +413,455 @@ async function insertDeviceEvent(pool, deviceId, event) {
   );
 }
 
+async function listFirmwareReleases(pool) {
+  const [rows] = await pool.execute(
+    `SELECT
+      fr.id,
+      fr.version,
+      fr.channel,
+      fr.firmware_url,
+      fr.sha256,
+      fr.notes,
+      fr.is_active,
+      fr.created_at,
+      (
+        SELECT COUNT(*)
+        FROM device_firmware_deployments dfd
+        WHERE dfd.firmware_release_id = fr.id
+          AND dfd.status IN ('pending', 'applying')
+      ) AS active_deployments
+    FROM firmware_releases fr
+    ORDER BY fr.created_at DESC, fr.id DESC`
+  );
+
+  return rows.map(formatFirmwareReleaseRow);
+}
+
+async function getFirmwareReleaseById(pool, releaseId) {
+  const [rows] = await pool.execute(
+    `SELECT
+      id,
+      version,
+      channel,
+      firmware_url,
+      sha256,
+      notes,
+      is_active,
+      created_at
+    FROM firmware_releases
+    WHERE id = :id`,
+    { id: releaseId }
+  );
+
+  return rows.length ? formatFirmwareReleaseRow(rows[0]) : null;
+}
+
+async function createFirmwareRelease(pool, release) {
+  const [result] = await pool.execute(
+    `INSERT INTO firmware_releases (
+      version,
+      channel,
+      firmware_url,
+      sha256,
+      notes,
+      is_active
+    ) VALUES (
+      :version,
+      :channel,
+      :firmware_url,
+      :sha256,
+      :notes,
+      1
+    )
+    ON DUPLICATE KEY UPDATE
+      firmware_url = VALUES(firmware_url),
+      sha256 = VALUES(sha256),
+      notes = VALUES(notes),
+      is_active = 1`,
+    {
+      version: release.version,
+      channel: release.channel,
+      firmware_url: release.firmware_url,
+      sha256: release.sha256,
+      notes: release.notes,
+    }
+  );
+
+  if (result.insertId) {
+    return getFirmwareReleaseById(pool, result.insertId);
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT id
+    FROM firmware_releases
+    WHERE version = :version AND channel = :channel
+    LIMIT 1`,
+    {
+      version: release.version,
+      channel: release.channel,
+    }
+  );
+
+  return rows.length ? getFirmwareReleaseById(pool, rows[0].id) : null;
+}
+
+async function listDeveloperDevices(pool) {
+  const devices = await listDevices(pool);
+
+  if (!devices.length) {
+    return [];
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT
+      dfd.device_id,
+      dfd.id AS deployment_id,
+      dfd.status AS deployment_status,
+      dfd.requested_at,
+      dfd.applied_at,
+      dfd.failed_at,
+      dfd.last_error,
+      fr.id AS release_id,
+      fr.version AS release_version,
+      fr.channel AS release_channel,
+      fr.firmware_url
+    FROM device_firmware_deployments dfd
+    INNER JOIN (
+      SELECT device_id, MAX(id) AS latest_id
+      FROM device_firmware_deployments
+      GROUP BY device_id
+    ) latest ON latest.latest_id = dfd.id
+    INNER JOIN firmware_releases fr ON fr.id = dfd.firmware_release_id`
+  );
+
+  const deploymentMap = new Map(rows.map((row) => [row.device_id, formatFirmwareDeploymentRow(row)]));
+
+  return devices.map((device) => ({
+    ...device,
+    latest_deployment: deploymentMap.get(device.device_id) || null,
+  }));
+}
+
+async function getDeveloperDeviceDetails(pool, deviceId) {
+  const device = await getDeviceDetails(pool, deviceId);
+  if (!device) {
+    return null;
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT
+      dfd.id AS deployment_id,
+      dfd.device_id,
+      dfd.status AS deployment_status,
+      dfd.requested_at,
+      dfd.applied_at,
+      dfd.failed_at,
+      dfd.last_error,
+      fr.id AS release_id,
+      fr.version AS release_version,
+      fr.channel AS release_channel,
+      fr.firmware_url
+    FROM device_firmware_deployments dfd
+    INNER JOIN firmware_releases fr ON fr.id = dfd.firmware_release_id
+    WHERE dfd.device_id = :device_id
+    ORDER BY dfd.id DESC
+    LIMIT 10`,
+    {
+      device_id: deviceId,
+    }
+  );
+
+  return {
+    ...device,
+    deployments: rows.map(formatFirmwareDeploymentRow),
+  };
+}
+
+async function queueFirmwareDeployment(pool, releaseId, deviceIds) {
+  const release = await getFirmwareReleaseById(pool, releaseId);
+  if (!release) {
+    return null;
+  }
+
+  let targetDeviceIds = Array.isArray(deviceIds) ? [...new Set(deviceIds)] : [];
+  if (!targetDeviceIds.length) {
+    const [rows] = await pool.execute("SELECT device_id FROM devices ORDER BY device_id");
+    targetDeviceIds = rows.map((row) => row.device_id);
+  }
+
+  if (!targetDeviceIds.length) {
+    return {
+      release,
+      device_ids: [],
+      created: 0,
+    };
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const placeholders = targetDeviceIds.map(() => "?").join(",");
+    const [deviceRows] = await connection.query(
+      `SELECT device_id
+      FROM devices
+      WHERE device_id IN (${placeholders})`,
+      targetDeviceIds
+    );
+
+    const existingDeviceIds = deviceRows.map((row) => row.device_id);
+
+    for (const deviceId of existingDeviceIds) {
+      await connection.execute(
+        `UPDATE device_firmware_deployments
+        SET status = 'cancelled',
+            last_error = NULL
+        WHERE device_id = :device_id
+          AND status IN ('pending', 'applying')`,
+        { device_id: deviceId }
+      );
+
+      await connection.execute(
+        `INSERT INTO device_firmware_deployments (
+          device_id,
+          firmware_release_id,
+          status,
+          requested_at,
+          created_at,
+          updated_at
+        ) VALUES (
+          :device_id,
+          :firmware_release_id,
+          'pending',
+          UTC_TIMESTAMP(),
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        )`,
+        {
+          device_id: deviceId,
+          firmware_release_id: releaseId,
+        }
+      );
+    }
+
+    await connection.commit();
+
+    return {
+      release,
+      device_ids: existingDeviceIds,
+      created: existingDeviceIds.length,
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function cancelFirmwareDeployment(pool, deploymentId) {
+  const [rows] = await pool.execute(
+    `SELECT
+      dfd.id AS deployment_id,
+      dfd.device_id,
+      dfd.status AS deployment_status,
+      dfd.requested_at,
+      dfd.applied_at,
+      dfd.failed_at,
+      dfd.last_error,
+      fr.id AS release_id,
+      fr.version AS release_version,
+      fr.channel AS release_channel,
+      fr.firmware_url
+    FROM device_firmware_deployments dfd
+    INNER JOIN firmware_releases fr ON fr.id = dfd.firmware_release_id
+    WHERE dfd.id = :id`,
+    { id: deploymentId }
+  );
+
+  if (!rows.length) {
+    return null;
+  }
+
+  await pool.execute(
+    `UPDATE device_firmware_deployments
+    SET status = 'cancelled',
+        last_error = NULL
+    WHERE id = :id`,
+    { id: deploymentId }
+  );
+
+  return {
+    ...formatFirmwareDeploymentRow(rows[0]),
+    status: "cancelled",
+  };
+}
+
+async function getPendingFirmwareDeployment(pool, deviceId, currentVersion) {
+  const [rows] = await pool.execute(
+    `SELECT
+      dfd.id AS deployment_id,
+      dfd.device_id,
+      dfd.status AS deployment_status,
+      dfd.requested_at,
+      dfd.applied_at,
+      dfd.failed_at,
+      dfd.last_error,
+      fr.id AS release_id,
+      fr.version AS release_version,
+      fr.channel AS release_channel,
+      fr.firmware_url,
+      fr.sha256,
+      fr.notes
+    FROM device_firmware_deployments dfd
+    INNER JOIN firmware_releases fr ON fr.id = dfd.firmware_release_id
+    WHERE dfd.device_id = :device_id
+      AND dfd.status IN ('pending', 'applying')
+    ORDER BY dfd.id DESC
+    LIMIT 1`,
+    { device_id: deviceId }
+  );
+
+  if (!rows.length) {
+    return null;
+  }
+
+  const deployment = formatFirmwareDeploymentRow(rows[0]);
+  if (currentVersion && deployment.release.version === currentVersion) {
+    await markFirmwareDeploymentAppliedByVersion(pool, deviceId, currentVersion);
+    return null;
+  }
+
+  return deployment;
+}
+
+async function markFirmwareDeploymentApplying(pool, deviceId) {
+  const latest = await getLatestDeploymentForDevice(pool, deviceId, ["pending", "applying"]);
+  if (!latest) {
+    return null;
+  }
+
+  await pool.execute(
+    `UPDATE device_firmware_deployments
+    SET status = 'applying',
+        last_error = NULL
+    WHERE id = :id`,
+    { id: latest.deployment_id }
+  );
+
+  return {
+    ...latest,
+    status: "applying",
+  };
+}
+
+async function markFirmwareDeploymentFailed(pool, deviceId, lastError) {
+  const latest = await getLatestDeploymentForDevice(pool, deviceId, ["pending", "applying"]);
+  if (!latest) {
+    return null;
+  }
+
+  await pool.execute(
+    `UPDATE device_firmware_deployments
+    SET status = 'failed',
+        failed_at = UTC_TIMESTAMP(),
+        last_error = :last_error
+    WHERE id = :id`,
+    {
+      id: latest.deployment_id,
+      last_error: lastError || null,
+    }
+  );
+
+  return {
+    ...latest,
+    status: "failed",
+    last_error: lastError || null,
+  };
+}
+
+async function markFirmwareDeploymentAppliedByVersion(pool, deviceId, firmwareVersion) {
+  if (!firmwareVersion) {
+    return null;
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT
+      dfd.id AS deployment_id,
+      dfd.device_id,
+      dfd.status AS deployment_status,
+      dfd.requested_at,
+      dfd.applied_at,
+      dfd.failed_at,
+      dfd.last_error,
+      fr.id AS release_id,
+      fr.version AS release_version,
+      fr.channel AS release_channel,
+      fr.firmware_url
+    FROM device_firmware_deployments dfd
+    INNER JOIN firmware_releases fr ON fr.id = dfd.firmware_release_id
+    WHERE dfd.device_id = :device_id
+      AND fr.version = :firmware_version
+      AND dfd.status IN ('pending', 'applying', 'failed')
+    ORDER BY dfd.id DESC
+    LIMIT 1`,
+    {
+      device_id: deviceId,
+      firmware_version: firmwareVersion,
+    }
+  );
+
+  if (!rows.length) {
+    return null;
+  }
+
+  await pool.execute(
+    `UPDATE device_firmware_deployments
+    SET status = 'applied',
+        applied_at = UTC_TIMESTAMP(),
+        failed_at = NULL,
+        last_error = NULL
+    WHERE id = :id`,
+    { id: rows[0].deployment_id }
+  );
+
+  return {
+    ...formatFirmwareDeploymentRow(rows[0]),
+    status: "applied",
+  };
+}
+
+async function getLatestDeploymentForDevice(pool, deviceId, statuses) {
+  if (!Array.isArray(statuses) || !statuses.length) {
+    return null;
+  }
+
+  const placeholders = statuses.map(() => "?").join(",");
+  const [rows] = await pool.query(
+    `SELECT
+      dfd.id AS deployment_id,
+      dfd.device_id,
+      dfd.status AS deployment_status,
+      dfd.requested_at,
+      dfd.applied_at,
+      dfd.failed_at,
+      dfd.last_error,
+      fr.id AS release_id,
+      fr.version AS release_version,
+      fr.channel AS release_channel,
+      fr.firmware_url
+    FROM device_firmware_deployments dfd
+    INNER JOIN firmware_releases fr ON fr.id = dfd.firmware_release_id
+    WHERE dfd.device_id = ?
+      AND dfd.status IN (${placeholders})
+    ORDER BY dfd.id DESC
+    LIMIT 1`,
+    [deviceId, ...statuses]
+  );
+
+  return rows.length ? formatFirmwareDeploymentRow(rows[0]) : null;
+}
+
 function formatDeviceRow(row) {
   return {
     device_id: row.device_id,
@@ -449,14 +911,60 @@ function formatScheduleRow(row) {
   };
 }
 
+function formatFirmwareReleaseRow(row) {
+  return {
+    id: row.id,
+    version: row.version,
+    channel: row.channel,
+    firmware_url: row.firmware_url,
+    sha256: row.sha256 || null,
+    notes: row.notes || null,
+    is_active: Boolean(row.is_active),
+    active_deployments: row.active_deployments === undefined ? undefined : Number(row.active_deployments || 0),
+    created_at: row.created_at,
+  };
+}
+
+function formatFirmwareDeploymentRow(row) {
+  return {
+    deployment_id: row.deployment_id,
+    device_id: row.device_id,
+    status: row.deployment_status,
+    requested_at: row.requested_at,
+    applied_at: row.applied_at,
+    failed_at: row.failed_at,
+    last_error: row.last_error || null,
+    release: {
+      id: row.release_id,
+      version: row.release_version,
+      channel: row.release_channel,
+      firmware_url: row.firmware_url,
+      sha256: row.sha256 || null,
+      notes: row.notes || null,
+    },
+  };
+}
+
 module.exports = {
+  cancelFirmwareDeployment,
+  createFirmwareRelease,
   createDatabasePool,
   upsertDevice,
+  deleteDeviceById,
+  getDeveloperDeviceDetails,
   listDevices,
+  listDeveloperDevices,
+  listFirmwareReleases,
   getDeviceDetails,
   getDeviceAuthRecord,
   getDeviceConfig,
+  getFirmwareReleaseById,
+  getPendingFirmwareDeployment,
   listSchedulesForDevice,
+  markFirmwareDeploymentAppliedByVersion,
+  markFirmwareDeploymentApplying,
+  markFirmwareDeploymentFailed,
+  queueFirmwareDeployment,
   createSchedule,
   updateSchedule,
   updateScheduleEnabled,

@@ -1,11 +1,13 @@
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
 #include <WiFiClientSecureBearSSL.h>
 using SecureApiClient = BearSSL::WiFiClientSecure;
 #elif defined(ESP32)
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #include <WiFiClientSecure.h>
 using SecureApiClient = WiFiClientSecure;
 #else
@@ -36,6 +38,7 @@ static const int MAX_SCHEDULES = 12;
 static const int EEPROM_CACHE_OFFSET = 32;
 static const unsigned long WIFI_RETRY_MS = 15000;
 static const unsigned long HEARTBEAT_FALLBACK_MS = 60000;
+static const unsigned long OTA_RETRY_MS = 30000;
 static const unsigned long UI_REFRESH_MS = 250;
 static const unsigned long NETWORK_QUIET_WINDOW_SECONDS = 90;
 static const uint16_t API_HTTP_TIMEOUT_MS = 3500;
@@ -137,9 +140,20 @@ struct PersistedCache {
   PersistedSchedule schedules[MAX_SCHEDULES];
 };
 
+struct OtaInstruction {
+  bool pending;
+  int deploymentId;
+  char version[32];
+  char channel[24];
+  char firmwareUrl[256];
+  char sha256[65];
+  char notes[128];
+};
+
 LocalSettings localSettings = {EEPROM_MAGIC, 1};
 DeviceConfig deviceConfig = {"D1 mini", "Agenda", true, -180, 60};
 DeviceSchedule schedules[MAX_SCHEDULES];
+OtaInstruction otaInstruction = {false, 0, "", "", "", "", ""};
 
 UiState currentUi = UI_HOME;
 int menuOption = 0;
@@ -150,6 +164,7 @@ unsigned long lastButtonAt = 0;
 unsigned long lastWiFiAttemptAt = 0;
 unsigned long lastApiAttemptAt = 0;
 unsigned long lastHeartbeatAt = 0;
+unsigned long lastOtaAttemptAt = 0;
 unsigned long lastUiRefreshAt = 0;
 int lastTriggeredDay[MAX_SCHEDULES];
 int lastTriggeredMinuteOfDay[MAX_SCHEDULES];
@@ -187,9 +202,14 @@ bool restoreCachedTimeFromCache();
 bool applyServerTimeFromJson(JsonVariant value);
 bool parseUtcIso8601(const char* value, time_t* result);
 int64_t daysFromCivil(int year, unsigned month, unsigned day);
+bool applyOtaFromJson(JsonVariant value);
 bool beginApiRequest(HTTPClient& http, WiFiClient& plainClient, SecureApiClient& secureClient, const String& url);
+void clearOtaInstruction();
 bool isSecureApiUrl(const String& url);
 bool configureSecureApiClient(SecureApiClient& secureClient);
+bool performOtaUpdate();
+bool maybeRunOtaUpdate();
+void sendOtaEvent(const char* eventType, const char* message, const char* version, int deploymentId);
 
 void setup() {
   Serial.begin(115200);
@@ -232,6 +252,7 @@ void loop() {
   checkSchedules();
   ensureWiFiConnected();
   maybeSyncWithApi();
+  maybeRunOtaUpdate();
 
   if (millis() - lastUiRefreshAt >= UI_REFRESH_MS) {
     drawCurrentScreen();
@@ -498,6 +519,10 @@ bool configureSecureApiClient(SecureApiClient& secureClient) {
   return true;
 }
 
+void clearOtaInstruction() {
+  memset(&otaInstruction, 0, sizeof(otaInstruction));
+}
+
 bool syncWithApi(const char* reason) {
   if (strcmp(reason, "boot") != 0 && shouldProtectUpcomingAlarm()) {
     lastSyncMessage = "Perto do toque";
@@ -550,11 +575,12 @@ bool syncWithApi(const char* reason) {
   applyServerTimeFromJson(doc["server_time"]);
   bool configChanged = applyDeviceConfigFromJson(doc["device"].as<JsonObject>());
   bool schedulesChanged = loadSchedulesFromJson(doc["schedules"].as<JsonArray>());
+  applyOtaFromJson(doc["ota"]);
   saveOfflineCache(configChanged || schedulesChanged || !offlineCacheAvailable);
 
   apiOnline = true;
   lastHeartbeatAt = millis();
-  lastSyncMessage = "Sync OK";
+  lastSyncMessage = otaInstruction.pending ? "OTA pendente" : "Sync OK";
   return true;
 }
 
@@ -596,6 +622,38 @@ bool applyDeviceConfigFromJson(JsonObject device) {
          previousConfig.soundEnabledFromApi != deviceConfig.soundEnabledFromApi ||
          previousConfig.utcOffsetMinutes != deviceConfig.utcOffsetMinutes ||
          previousConfig.pollIntervalSeconds != deviceConfig.pollIntervalSeconds;
+}
+
+bool applyOtaFromJson(JsonVariant value) {
+  JsonObject ota = value.as<JsonObject>();
+  if (ota.isNull()) {
+    bool hadPending = otaInstruction.pending;
+    clearOtaInstruction();
+    return hadPending;
+  }
+
+  const char* version = ota["version"] | "";
+  const char* firmwareUrl = ota["firmware_url"] | "";
+  if (version[0] == '\0' || firmwareUrl[0] == '\0' || strcmp(version, FIRMWARE_VERSION) == 0) {
+    bool hadPending = otaInstruction.pending;
+    clearOtaInstruction();
+    return hadPending;
+  }
+
+  bool changed =
+    !otaInstruction.pending ||
+    otaInstruction.deploymentId != (ota["deployment_id"] | 0) ||
+    strcmp(otaInstruction.version, version) != 0 ||
+    strcmp(otaInstruction.firmwareUrl, firmwareUrl) != 0;
+
+  otaInstruction.pending = true;
+  otaInstruction.deploymentId = ota["deployment_id"] | 0;
+  copyJsonText(ota["version"], otaInstruction.version, sizeof(otaInstruction.version), "");
+  copyJsonText(ota["channel"], otaInstruction.channel, sizeof(otaInstruction.channel), "stable");
+  copyJsonText(ota["firmware_url"], otaInstruction.firmwareUrl, sizeof(otaInstruction.firmwareUrl), "");
+  copyJsonText(ota["sha256"], otaInstruction.sha256, sizeof(otaInstruction.sha256), "");
+  copyJsonText(ota["notes"], otaInstruction.notes, sizeof(otaInstruction.notes), "");
+  return changed;
 }
 
 bool loadSchedulesFromJson(JsonArray array) {
@@ -768,6 +826,41 @@ void sendEvent(const char* eventType, const char* message, int scheduleId) {
 
   JsonObject payload = doc.createNestedObject("payload");
   payload["schedule_id"] = scheduleId;
+  payload["current_screen"] = currentUiName();
+  payload["wifi_rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
+
+  String body;
+  serializeJson(doc, body);
+  http.POST(body);
+  http.end();
+}
+
+void sendOtaEvent(const char* eventType, const char* message, const char* version, int deploymentId) {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  WiFiClient plainClient;
+  SecureApiClient secureClient;
+  HTTPClient http;
+  String url = String(API_BASE_URL) + "/api/devices/" + DEVICE_ID + "/events";
+
+  if (!beginApiRequest(http, plainClient, secureClient, url)) {
+    return;
+  }
+
+  http.setTimeout(API_HTTP_TIMEOUT_MS);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-DEVICE-KEY", DEVICE_API_KEY);
+
+  StaticJsonDocument<512> doc;
+  doc["event_type"] = eventType;
+  doc["message"] = message;
+  doc["occurred_at"] = currentTimestampIso();
+
+  JsonObject payload = doc.createNestedObject("payload");
+  payload["deployment_id"] = deploymentId;
+  payload["version"] = version ? version : "";
   payload["current_screen"] = currentUiName();
   payload["wifi_rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
 
@@ -1209,6 +1302,107 @@ bool shouldProtectUpcomingAlarm() {
   }
 
   return static_cast<unsigned long>(nextAlarm - now) <= NETWORK_QUIET_WINDOW_SECONDS;
+}
+
+bool maybeRunOtaUpdate() {
+  if (!otaInstruction.pending) {
+    return false;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    lastSyncMessage = "OTA sem WiFi";
+    return false;
+  }
+
+  if (shouldProtectUpcomingAlarm()) {
+    lastSyncMessage = "OTA aguardando";
+    return false;
+  }
+
+  if (millis() - lastOtaAttemptAt < OTA_RETRY_MS) {
+    return false;
+  }
+
+  lastOtaAttemptAt = millis();
+  return performOtaUpdate();
+}
+
+bool performOtaUpdate() {
+  String firmwareUrl = String(otaInstruction.firmwareUrl);
+  if (firmwareUrl.length() == 0) {
+    clearOtaInstruction();
+    return false;
+  }
+
+  lastSyncMessage = "OTA " + String(otaInstruction.version);
+  sendOtaEvent("ota_start", "Iniciando atualizacao OTA", otaInstruction.version, otaInstruction.deploymentId);
+
+#if defined(ESP8266)
+  ESPhttpUpdate.rebootOnUpdate(false);
+  t_httpUpdate_return updateResult = HTTP_UPDATE_FAILED;
+
+  if (isSecureApiUrl(firmwareUrl)) {
+    SecureApiClient secureClient;
+    if (!configureSecureApiClient(secureClient)) {
+      sendOtaEvent("ota_failure", "Falha ao validar TLS para OTA", otaInstruction.version, otaInstruction.deploymentId);
+      clearOtaInstruction();
+      return false;
+    }
+
+    updateResult = ESPhttpUpdate.update(secureClient, firmwareUrl, FIRMWARE_VERSION);
+  } else {
+    WiFiClient plainClient;
+    updateResult = ESPhttpUpdate.update(plainClient, firmwareUrl, FIRMWARE_VERSION);
+  }
+
+  if (updateResult == HTTP_UPDATE_OK) {
+    sendOtaEvent("ota_success", "Atualizacao OTA concluida", otaInstruction.version, otaInstruction.deploymentId);
+    delay(250);
+    ESP.restart();
+    return true;
+  }
+
+  String otaError = updateResult == HTTP_UPDATE_NO_UPDATES
+    ? "Nenhuma atualizacao disponivel"
+    : ESPhttpUpdate.getLastErrorString();
+#else
+  httpUpdate.rebootOnUpdate(false);
+  t_httpUpdate_return updateResult = HTTP_UPDATE_FAILED;
+
+  if (isSecureApiUrl(firmwareUrl)) {
+    SecureApiClient secureClient;
+    if (!configureSecureApiClient(secureClient)) {
+      sendOtaEvent("ota_failure", "Falha ao validar TLS para OTA", otaInstruction.version, otaInstruction.deploymentId);
+      clearOtaInstruction();
+      return false;
+    }
+
+    updateResult = httpUpdate.update(secureClient, firmwareUrl, FIRMWARE_VERSION);
+  } else {
+    WiFiClient plainClient;
+    updateResult = httpUpdate.update(plainClient, firmwareUrl, FIRMWARE_VERSION);
+  }
+
+  if (updateResult == HTTP_UPDATE_OK) {
+    sendOtaEvent("ota_success", "Atualizacao OTA concluida", otaInstruction.version, otaInstruction.deploymentId);
+    delay(250);
+    ESP.restart();
+    return true;
+  }
+
+  String otaError = updateResult == HTTP_UPDATE_NO_UPDATES
+    ? "Nenhuma atualizacao disponivel"
+    : httpUpdate.getLastErrorString();
+#endif
+
+  if (otaError.length() == 0) {
+    otaError = "Falha ao aplicar OTA";
+  }
+
+  lastSyncMessage = "OTA falhou";
+  sendOtaEvent("ota_failure", otaError.c_str(), otaInstruction.version, otaInstruction.deploymentId);
+  clearOtaInstruction();
+  return false;
 }
 
 void buildPersistedCache(PersistedCache& cache, uint32_t cachedUtcEpoch) {

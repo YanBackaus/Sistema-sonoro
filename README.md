@@ -90,6 +90,9 @@ Configure `.env` a partir de [.env.example](/C:/Users/Schenkel_Dell/Desktop/marc
 - `PORT`
 - `ADMIN_API_KEY`
 - `API_KEY` como fallback de compatibilidade
+- `DEVELOPER_PASSWORD`
+- `DEVELOPER_SESSION_SECRET`
+- `DEVELOPER_SESSION_TTL_HOURS`
 - `DEVICE_KEY_PEPPER`
 - `EXPOSE_ERROR_DETAILS`
 - `DEFAULT_UTC_OFFSET_MINUTES`
@@ -121,6 +124,11 @@ npm start
 API padrao:
 
 `http://localhost:3000`
+
+Portal do desenvolvedor:
+
+- `GET /developer/login`
+- `GET /developer`
 
 ### Dashboard sincronizado
 
@@ -263,6 +271,18 @@ Exemplo:
   }
 }
 ```
+
+### Portal do desenvolvedor
+
+O portal de desenvolvedor fica separado do `/admin` e usa senha propria com sessao em cookie.
+
+Ele permite:
+
+- cadastrar, editar e excluir ESPs
+- gerar ou trocar a chave individual de cada device
+- cadastrar releases OTA com `versao + URL do .bin`
+- mandar uma release para um ESP especifico ou para todos
+- acompanhar deploys pendentes, aplicados, cancelados e com falha
 
 ### Listar horarios de um device
 

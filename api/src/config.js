@@ -25,11 +25,16 @@ function getOptionalEnv(name) {
 
 const adminApiKey = getOptionalEnv("ADMIN_API_KEY") || getRequiredEnv("API_KEY");
 const deviceKeyPepper = getOptionalEnv("DEVICE_KEY_PEPPER") || adminApiKey;
+const developerPassword = getOptionalEnv("DEVELOPER_PASSWORD") || adminApiKey;
+const developerSessionSecret = getOptionalEnv("DEVELOPER_SESSION_SECRET") || deviceKeyPepper;
 
 const config = {
   port: Number(process.env.PORT || 3000),
   adminApiKey,
   deviceKeyPepper,
+  developerPassword,
+  developerSessionSecret,
+  developerSessionTtlHours: Number(process.env.DEVELOPER_SESSION_TTL_HOURS || 12),
   exposeErrorDetails: parseBooleanEnv(process.env.EXPOSE_ERROR_DETAILS, false),
   defaultUtcOffsetMinutes: Number(process.env.DEFAULT_UTC_OFFSET_MINUTES || -180),
   defaultPollIntervalSeconds: Number(process.env.DEFAULT_POLL_INTERVAL_SECONDS || 60),
