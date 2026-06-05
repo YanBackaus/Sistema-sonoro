@@ -3,3 +3,4 @@ api/node_modules/
 api/serviceAccountKey.json
 api/*.local.pem
 esp32/esp32_oled_mysql_firebase/secrets.h
+esp32/testD1Mini/secrets.h
