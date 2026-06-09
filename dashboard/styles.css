@@ -112,6 +112,25 @@ code,
   gap: 16px;
 }
 
+.session-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.session-summary {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(18, 123, 105, 0.16);
+  background: rgba(18, 123, 105, 0.08);
+}
+
+.session-summary p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .eyebrow,
 .section-kicker {
   margin: 0 0 12px;
@@ -467,6 +486,10 @@ button:active {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.section-head-spaced {
+  margin-top: 24px;
 }
 
 .live-dot-wrap {

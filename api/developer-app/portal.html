@@ -14,16 +14,21 @@
     <header class="developer-hero">
       <div>
         <p class="eyebrow">Desenvolvedor</p>
-        <h1>Controle de firmware e ESPs</h1>
-        <p class="developer-copy">Gerencie os ESPs cadastrados e publique novas versoes de firmware por OTA.</p>
+        <h1>Painel de usuarios, ESPs e OTA</h1>
+        <p class="developer-copy">Centralize cadastro, dono de cada ESP e releases OTA com mais controle sobre cada firmware.</p>
       </div>
       <div class="developer-toolbar">
         <span class="developer-chip" id="developerSessionChip">Sessao ativa</span>
+        <button type="button" class="button-secondary" id="developerRefreshButton">Atualizar</button>
         <button type="button" class="button-secondary" id="developerLogoutButton">Sair</button>
       </div>
     </header>
 
-    <section class="developer-stats" id="developerStats">
+    <section class="developer-stats">
+      <article class="developer-stat-card">
+        <span>Usuarios</span>
+        <strong id="statUsers">--</strong>
+      </article>
       <article class="developer-stat-card">
         <span>ESPs</span>
         <strong id="statDevices">--</strong>
@@ -37,184 +42,412 @@
         <strong id="statReleases">--</strong>
       </article>
       <article class="developer-stat-card">
-        <span>Deploys pendentes</span>
+        <span>Pendentes</span>
         <strong id="statPendingDeployments">--</strong>
       </article>
     </section>
 
-    <p class="developer-banner" id="developerBanner">Carregando dados...</p>
+    <p class="developer-banner" id="developerBanner">Carregando portal...</p>
 
-    <main class="developer-grid">
-      <section class="developer-panel developer-panel-tall">
-        <div class="developer-panel-head">
-          <div>
-            <p class="section-kicker">ESPs cadastrados</p>
-            <h2>Dispositivos</h2>
+    <nav class="developer-tabs" aria-label="Abas do desenvolvedor">
+      <button type="button" class="developer-tab-button is-active" data-tab="users">Usuarios</button>
+      <button type="button" class="developer-tab-button" data-tab="devices">ESPs</button>
+      <button type="button" class="developer-tab-button" data-tab="updates">Updates</button>
+    </nav>
+
+    <main class="developer-tab-panels">
+      <section class="developer-tab-panel is-active" data-tab-panel="users">
+        <div class="developer-grid">
+          <section class="developer-panel developer-panel-tall">
+            <div class="developer-panel-head">
+              <div>
+                <p class="section-kicker">Usuarios</p>
+                <h2>Clientes cadastrados</h2>
+              </div>
+            </div>
+
+            <div class="developer-list" id="developerUserList">
+              <div class="empty-state">Nenhum usuario carregado.</div>
+            </div>
+          </section>
+
+          <div class="developer-stack">
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Cadastro</p>
+                  <h2 id="developerUserTitle">Novo usuario</h2>
+                </div>
+              </div>
+
+              <form id="developerUserForm" class="stack-form">
+                <div class="field-grid">
+                  <label class="field">
+                    <span>ID do usuario</span>
+                    <input id="developerUserIdInput" type="text" placeholder="empresa_alpha" autocomplete="off" required>
+                  </label>
+                  <label class="field">
+                    <span>Status</span>
+                    <select id="developerUserStatusInput">
+                      <option value="active">Ativo</option>
+                      <option value="paused">Pausado</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Empresa</span>
+                    <input id="developerUserCompanyInput" type="text" placeholder="Empresa Alpha" autocomplete="off" required>
+                  </label>
+                  <label class="field">
+                    <span>Contato</span>
+                    <input id="developerUserContactInput" type="text" placeholder="Responsavel" autocomplete="off">
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>E-mail</span>
+                  <input id="developerUserEmailInput" type="email" placeholder="contato@empresa.com" autocomplete="off" required>
+                </label>
+
+                <label class="field">
+                  <span>Senha (opcional)</span>
+                  <input id="developerUserPasswordInput" type="text" placeholder="Deixe vazio para gerar automaticamente" autocomplete="new-password">
+                </label>
+
+                <label class="toggle">
+                  <input id="developerUserRotatePasswordInput" type="checkbox">
+                  <span>Gerar nova senha ao salvar</span>
+                </label>
+
+                <div class="developer-inline-actions">
+                  <button type="submit">Salvar usuario</button>
+                  <button type="button" class="button-secondary" id="developerUserResetButton">Limpar</button>
+                  <button type="button" class="button-danger" id="developerUserDeleteButton" hidden>Excluir</button>
+                </div>
+
+                <div class="developer-note-card" id="developerUserProvisioningCard" hidden>
+                  <strong>Senha gerada</strong>
+                  <code id="developerUserProvisioningValue"></code>
+                </div>
+              </form>
+            </section>
+
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Resumo</p>
+                  <h2>Usuario selecionado</h2>
+                </div>
+              </div>
+
+              <div class="developer-note-card developer-summary-card" id="developerUserSummary">
+                <strong>Nenhum usuario selecionado</strong>
+                <p>Escolha um cliente para ver os ESPs vinculados e conferir o status da conta.</p>
+              </div>
+            </section>
           </div>
-          <button type="button" class="button-secondary" id="developerRefreshButton">Atualizar</button>
-        </div>
-
-        <div class="developer-list" id="developerDeviceList">
-          <div class="empty-state">Nenhum ESP carregado.</div>
         </div>
       </section>
 
-      <section class="developer-panel">
-        <div class="developer-panel-head">
-          <div>
-            <p class="section-kicker">Editar ESP</p>
-            <h2 id="developerDeviceTitle">Novo ESP</h2>
+      <section class="developer-tab-panel" data-tab-panel="devices" hidden>
+        <div class="developer-grid">
+          <section class="developer-panel developer-panel-tall">
+            <div class="developer-panel-head">
+              <div>
+                <p class="section-kicker">ESPs</p>
+                <h2>Dispositivos cadastrados</h2>
+              </div>
+            </div>
+
+            <div class="developer-list" id="developerDeviceList">
+              <div class="empty-state">Nenhum ESP carregado.</div>
+            </div>
+          </section>
+
+          <div class="developer-stack">
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Cadastro</p>
+                  <h2 id="developerDeviceTitle">Novo ESP</h2>
+                </div>
+              </div>
+
+              <form id="developerDeviceForm" class="stack-form">
+                <div class="field-grid">
+                  <label class="field">
+                    <span>ID do ESP</span>
+                    <input id="developerDeviceIdInput" type="text" placeholder="d1mini_03" autocomplete="off" required>
+                  </label>
+                  <label class="field">
+                    <span>Nome</span>
+                    <input id="developerDeviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Usuario dono</span>
+                    <select id="developerDeviceOwnerInput">
+                      <option value="">Sem usuario</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Local</span>
+                    <input id="developerDeviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Titulo no menu</span>
+                    <input id="developerDeviceMenuInput" type="text" placeholder="Corredor" autocomplete="off">
+                  </label>
+                  <label class="field">
+                    <span>Hardware</span>
+                    <input id="developerDeviceHardwareModelInput" type="text" placeholder="lolin_d1_mini" autocomplete="off">
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Perfil do firmware</span>
+                    <input id="developerDeviceFirmwareProfileInput" type="text" placeholder="d1mini_03" autocomplete="off">
+                  </label>
+                  <label class="field">
+                    <span>Heartbeat (s)</span>
+                    <input id="developerDevicePollInput" type="number" min="15" value="60">
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Fuso (min)</span>
+                    <input id="developerDeviceUtcOffsetInput" type="number" value="-180">
+                  </label>
+                  <label class="field">
+                    <span>Nova chave (opcional)</span>
+                    <input id="developerDeviceKeyInput" type="text" placeholder="Deixe vazio para manter" autocomplete="off">
+                  </label>
+                </div>
+
+                <label class="toggle">
+                  <input id="developerDeviceSoundInput" type="checkbox" checked>
+                  <span>Som remoto ativo</span>
+                </label>
+
+                <label class="toggle">
+                  <input id="developerRotateKeyInput" type="checkbox">
+                  <span>Gerar nova chave ao salvar</span>
+                </label>
+
+                <div class="developer-inline-actions">
+                  <button type="submit">Salvar ESP</button>
+                  <button type="button" class="button-secondary" id="developerDeviceResetButton">Limpar</button>
+                  <button type="button" class="button-danger" id="developerDeviceDeleteButton" hidden>Excluir</button>
+                </div>
+
+                <div class="developer-note-card" id="developerProvisioningCard" hidden>
+                  <strong>Chave pronta para o firmware</strong>
+                  <code id="developerProvisioningValue"></code>
+                </div>
+              </form>
+            </section>
+
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Resumo</p>
+                  <h2>ESP selecionado</h2>
+                </div>
+              </div>
+
+              <div class="developer-note-card developer-summary-card" id="developerDeviceSummary">
+                <strong>Nenhum ESP selecionado</strong>
+                <p>Escolha um dispositivo para ver dono, chave parcial, versao atual e historico de deploy.</p>
+              </div>
+
+              <div class="developer-release-list" id="developerDeploymentHistory">
+                <div class="empty-state">Nenhum deployment para mostrar.</div>
+              </div>
+            </section>
           </div>
         </div>
-
-        <form id="developerDeviceForm" class="stack-form">
-          <div class="field-grid">
-            <label class="field">
-              <span>ID do ESP</span>
-              <input id="developerDeviceIdInput" type="text" placeholder="d1mini_03" autocomplete="off" required>
-            </label>
-            <label class="field">
-              <span>Nome</span>
-              <input id="developerDeviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
-            </label>
-          </div>
-
-          <div class="field-grid">
-            <label class="field">
-              <span>Local</span>
-              <input id="developerDeviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
-            </label>
-            <label class="field">
-              <span>Menu</span>
-              <input id="developerDeviceMenuInput" type="text" placeholder="Corredor" autocomplete="off">
-            </label>
-          </div>
-
-          <div class="field-grid">
-            <label class="field">
-              <span>Fuso (min)</span>
-              <input id="developerDeviceUtcOffsetInput" type="number" value="-180">
-            </label>
-            <label class="field">
-              <span>Heartbeat (s)</span>
-              <input id="developerDevicePollInput" type="number" min="15" value="60">
-            </label>
-          </div>
-
-          <label class="toggle">
-            <input id="developerDeviceSoundInput" type="checkbox" checked>
-            <span>Som remoto ativado</span>
-          </label>
-
-          <label class="field">
-            <span>Nova chave do ESP (opcional)</span>
-            <input id="developerDeviceKeyInput" type="text" placeholder="Deixe em branco para manter">
-          </label>
-
-          <label class="toggle">
-            <input id="developerRotateKeyInput" type="checkbox">
-            <span>Gerar nova chave ao salvar</span>
-          </label>
-
-          <div class="developer-inline-actions">
-            <button type="submit">Salvar ESP</button>
-            <button type="button" class="button-secondary" id="developerDeviceResetButton">Limpar</button>
-            <button type="button" class="button-danger" id="developerDeviceDeleteButton" hidden>Excluir</button>
-          </div>
-
-          <div class="developer-note-card" id="developerProvisioningCard" hidden>
-            <strong>Chave pronta para o firmware</strong>
-            <code id="developerProvisioningValue"></code>
-          </div>
-        </form>
       </section>
 
-      <section class="developer-panel">
-        <div class="developer-panel-head">
-          <div>
-            <p class="section-kicker">ESP selecionado</p>
-            <h2>Resumo e historico</h2>
+      <section class="developer-tab-panel" data-tab-panel="updates" hidden>
+        <div class="developer-grid">
+          <div class="developer-stack">
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Build</p>
+                  <h2>Plano do .bin</h2>
+                </div>
+              </div>
+
+              <form id="developerBuildPlanForm" class="stack-form">
+                <div class="field-grid">
+                  <label class="field">
+                    <span>ESP base</span>
+                    <select id="developerBuildPlanDeviceInput">
+                      <option value="">Selecione um ESP</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Versao</span>
+                    <input id="developerBuildPlanVersionInput" type="text" placeholder="1.0.1" autocomplete="off" required>
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>Canal</span>
+                  <input id="developerBuildPlanChannelInput" type="text" value="stable" placeholder="stable" autocomplete="off">
+                </label>
+
+                <div class="developer-inline-actions">
+                  <button type="submit">Gerar plano</button>
+                  <button type="button" class="button-secondary" id="developerBuildPlanUseButton" disabled>Usar na release</button>
+                </div>
+              </form>
+
+              <div class="developer-note-card developer-summary-card" id="developerBuildPlanCard">
+                <strong>Nenhum plano gerado</strong>
+                <p>Selecione um ESP e uma versao para montar o release_code, o nome do .bin e o comando sugerido.</p>
+              </div>
+            </section>
+
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Release</p>
+                  <h2>Nova release OTA</h2>
+                </div>
+              </div>
+
+              <form id="developerReleaseForm" class="stack-form">
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Release code</span>
+                    <input id="developerReleaseCodeInput" type="text" placeholder="stable-d1mini_03-1-0-1" autocomplete="off">
+                  </label>
+                  <label class="field">
+                    <span>Versao</span>
+                    <input id="developerReleaseVersionInput" type="text" placeholder="1.0.1" autocomplete="off" required>
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Canal</span>
+                    <input id="developerReleaseChannelInput" type="text" value="stable" placeholder="stable" autocomplete="off">
+                  </label>
+                  <label class="field">
+                    <span>Alvo</span>
+                    <select id="developerReleaseTargetTypeInput">
+                      <option value="all">Todos</option>
+                      <option value="user">Usuario</option>
+                      <option value="device">ESP</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field" id="developerReleaseTargetUserField" hidden>
+                    <span>Usuario alvo</span>
+                    <select id="developerReleaseTargetUserInput">
+                      <option value="">Selecione um usuario</option>
+                    </select>
+                  </label>
+                  <label class="field" id="developerReleaseTargetDeviceField" hidden>
+                    <span>ESP alvo</span>
+                    <select id="developerReleaseTargetDeviceInput">
+                      <option value="">Selecione um ESP</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Hardware</span>
+                    <input id="developerReleaseHardwareModelInput" type="text" placeholder="lolin_d1_mini" autocomplete="off">
+                  </label>
+                  <label class="field">
+                    <span>Arquivo .bin</span>
+                    <input id="developerReleaseBinaryFilenameInput" type="text" placeholder="d1mini_03_stable_1_0_1.bin" autocomplete="off">
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>Sketch usado</span>
+                  <input id="developerReleaseSketchPathInput" type="text" placeholder="C:\\projeto\\esp32\\...\\esp32_oled_mysql_firebase.ino" autocomplete="off">
+                </label>
+
+                <label class="field">
+                  <span>URL do firmware</span>
+                  <input id="developerReleaseUrlInput" type="text" placeholder="/firmware/d1mini_03_stable_1_0_1.bin" autocomplete="off" required>
+                </label>
+
+                <label class="field">
+                  <span>SHA-256 (opcional)</span>
+                  <input id="developerReleaseShaInput" type="text" placeholder="Hash do binario" autocomplete="off">
+                </label>
+
+                <label class="field">
+                  <span>Notas</span>
+                  <textarea id="developerReleaseNotesInput" rows="4" placeholder="Resumo da versao"></textarea>
+                </label>
+
+                <button type="submit">Salvar release</button>
+              </form>
+            </section>
           </div>
-        </div>
 
-        <div class="developer-note-card developer-summary-card" id="developerDeviceSummary">
-          <strong>Nenhum ESP selecionado</strong>
-          <p>Escolha um dispositivo na lista para ver detalhes e deploys recentes.</p>
-        </div>
+          <div class="developer-stack">
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Deploy</p>
+                  <h2>Enviar OTA</h2>
+                </div>
+              </div>
 
-        <div class="developer-release-list" id="developerDeploymentHistory">
-          <div class="empty-state">Nenhum deployment para mostrar.</div>
-        </div>
-      </section>
+              <form id="developerDeploymentForm" class="stack-form">
+                <label class="field">
+                  <span>Release</span>
+                  <select id="developerReleaseSelect">
+                    <option value="">Selecione uma release</option>
+                  </select>
+                </label>
 
-      <section class="developer-panel developer-panel-wide">
-        <div class="developer-panel-head">
-          <div>
-            <p class="section-kicker">Firmware</p>
-            <h2>Nova release OTA</h2>
+                <label class="field">
+                  <span>Destino</span>
+                  <select id="developerDeployTargetSelect">
+                    <option value="release_scope">Seguir o alvo da release</option>
+                    <option value="selected_device">Somente o ESP selecionado</option>
+                    <option value="all_devices">Todos os ESPs</option>
+                  </select>
+                </label>
+
+                <button type="submit">Enviar atualizacao</button>
+              </form>
+            </section>
+
+            <section class="developer-panel">
+              <div class="developer-panel-head">
+                <div>
+                  <p class="section-kicker">Historico</p>
+                  <h2>Releases cadastradas</h2>
+                </div>
+              </div>
+
+              <div class="developer-release-list" id="developerReleaseList">
+                <div class="empty-state">Nenhuma release cadastrada.</div>
+              </div>
+            </section>
           </div>
-        </div>
-
-        <form id="developerReleaseForm" class="stack-form">
-          <div class="field-grid">
-            <label class="field">
-              <span>Versao</span>
-              <input id="developerReleaseVersionInput" type="text" placeholder="1.0.1" autocomplete="off" required>
-            </label>
-            <label class="field">
-              <span>Canal</span>
-              <input id="developerReleaseChannelInput" type="text" placeholder="stable" value="stable" autocomplete="off">
-            </label>
-          </div>
-
-          <label class="field">
-            <span>URL do firmware</span>
-            <input id="developerReleaseUrlInput" type="text" placeholder="https://.../firmware.bin ou /firmware/d1mini.bin" autocomplete="off" required>
-          </label>
-
-          <label class="field">
-            <span>SHA-256 (opcional)</span>
-            <input id="developerReleaseShaInput" type="text" placeholder="Hash do binario para validacao" autocomplete="off">
-          </label>
-
-          <label class="field">
-            <span>Notas</span>
-            <textarea id="developerReleaseNotesInput" rows="4" placeholder="O que mudou nesta versao?"></textarea>
-          </label>
-
-          <button type="submit">Salvar release</button>
-        </form>
-      </section>
-
-      <section class="developer-panel developer-panel-wide">
-        <div class="developer-panel-head">
-          <div>
-            <p class="section-kicker">Deploy OTA</p>
-            <h2>Enviar firmware</h2>
-          </div>
-        </div>
-
-        <form id="developerDeploymentForm" class="stack-form">
-          <label class="field">
-            <span>Release</span>
-            <select id="developerReleaseSelect">
-              <option value="">Selecione uma release</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Destino</span>
-            <select id="developerDeployTargetSelect">
-              <option value="selected">ESP selecionado</option>
-              <option value="all">Todos os ESPs</option>
-            </select>
-          </label>
-
-          <button type="submit">Enviar atualizacao</button>
-        </form>
-
-        <div class="developer-release-list" id="developerReleaseList">
-          <div class="empty-state">Nenhuma release cadastrada.</div>
         </div>
       </section>
     </main>

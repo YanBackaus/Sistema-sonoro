@@ -5,6 +5,8 @@
   "description": "API Node.js para gerenciar agendas sonoras de dispositivos D1 mini com OLED.",
   "main": "index.js",
   "scripts": {
+    "db:schema": "node scripts/apply-schema.js",
+    "firmware:build": "node scripts/build-firmware.js",
     "sync:dashboard": "node scripts/sync-dashboard.js",
     "start": "npm run sync:dashboard && node src/server.js",
     "dev": "npm run sync:dashboard && node --watch src/server.js",

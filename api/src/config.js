@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -27,6 +28,8 @@ const adminApiKey = getOptionalEnv("ADMIN_API_KEY") || getRequiredEnv("API_KEY")
 const deviceKeyPepper = getOptionalEnv("DEVICE_KEY_PEPPER") || adminApiKey;
 const developerPassword = getOptionalEnv("DEVELOPER_PASSWORD") || adminApiKey;
 const developerSessionSecret = getOptionalEnv("DEVELOPER_SESSION_SECRET") || deviceKeyPepper;
+const clientSessionSecret = getOptionalEnv("CLIENT_SESSION_SECRET") || developerSessionSecret;
+const projectRoot = path.resolve(__dirname, "../..");
 
 const config = {
   port: Number(process.env.PORT || 3000),
@@ -34,10 +37,21 @@ const config = {
   deviceKeyPepper,
   developerPassword,
   developerSessionSecret,
+  clientSessionSecret,
   developerSessionTtlHours: Number(process.env.DEVELOPER_SESSION_TTL_HOURS || 12),
+  clientSessionTtlHours: Number(process.env.CLIENT_SESSION_TTL_HOURS || 12),
   exposeErrorDetails: parseBooleanEnv(process.env.EXPOSE_ERROR_DETAILS, false),
   defaultUtcOffsetMinutes: Number(process.env.DEFAULT_UTC_OFFSET_MINUTES || -180),
   defaultPollIntervalSeconds: Number(process.env.DEFAULT_POLL_INTERVAL_SECONDS || 60),
+  firmwareBuild: {
+    sketchPath:
+      getOptionalEnv("FIRMWARE_SKETCH_PATH") ||
+      path.join(projectRoot, "esp32", "esp32_oled_mysql_firebase", "esp32_oled_mysql_firebase.ino"),
+    outputDirectory:
+      getOptionalEnv("FIRMWARE_OUTPUT_DIRECTORY") ||
+      path.join(projectRoot, "api", "public", "firmware"),
+    boardFqbn: getOptionalEnv("FIRMWARE_BOARD_FQBN") || "esp8266:esp8266:d1_mini_lite",
+  },
   mysql: {
     host: getRequiredEnv("MYSQL_HOST"),
     port: Number(process.env.MYSQL_PORT || 3306),

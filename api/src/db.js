@@ -1,8 +1,10 @@
 const mysql = require("mysql2/promise");
 const {
   generateDeviceApiKey,
+  generatePortalPassword,
   getKeyLast4,
   hashDeviceApiKey,
+  hashPassword,
 } = require("./security");
 
 function createDatabasePool(mysqlConfig) {
@@ -51,9 +53,12 @@ async function upsertDevice(pool, device, securityConfig) {
   await pool.execute(
     `INSERT INTO devices (
       device_id,
+      owner_user_id,
       name,
       location,
       menu_title,
+      hardware_model,
+      firmware_profile,
       sound_enabled,
       utc_offset_minutes,
       poll_interval_seconds,
@@ -61,9 +66,12 @@ async function upsertDevice(pool, device, securityConfig) {
       device_api_key_last4
     ) VALUES (
       :device_id,
+      :owner_user_id,
       :name,
       :location,
       :menu_title,
+      :hardware_model,
+      :firmware_profile,
       :sound_enabled,
       :utc_offset_minutes,
       :poll_interval_seconds,
@@ -71,9 +79,12 @@ async function upsertDevice(pool, device, securityConfig) {
       :device_api_key_last4
     )
     ON DUPLICATE KEY UPDATE
+      owner_user_id = VALUES(owner_user_id),
       name = VALUES(name),
       location = VALUES(location),
       menu_title = VALUES(menu_title),
+      hardware_model = VALUES(hardware_model),
+      firmware_profile = VALUES(firmware_profile),
       sound_enabled = VALUES(sound_enabled),
       utc_offset_minutes = VALUES(utc_offset_minutes),
       poll_interval_seconds = VALUES(poll_interval_seconds),
@@ -81,9 +92,12 @@ async function upsertDevice(pool, device, securityConfig) {
       device_api_key_last4 = VALUES(device_api_key_last4)`,
     {
       device_id: device.device_id,
+      owner_user_id: device.owner_user_id,
       name: device.name,
       location: device.location,
       menu_title: device.menu_title,
+      hardware_model: device.hardware_model,
+      firmware_profile: device.firmware_profile,
       sound_enabled: device.sound_enabled ? 1 : 0,
       utc_offset_minutes: device.utc_offset_minutes,
       poll_interval_seconds: device.poll_interval_seconds,
@@ -107,24 +121,32 @@ async function listDevices(pool) {
   const [rows] = await pool.execute(
     `SELECT
       d.device_id,
+      d.owner_user_id,
       d.name,
       d.location,
       d.menu_title,
+      d.hardware_model,
+      d.firmware_profile,
       d.sound_enabled,
       d.local_sound_enabled,
       d.utc_offset_minutes,
       d.poll_interval_seconds,
       d.last_seen_at,
+      d.last_ip,
       d.current_screen,
+      d.current_menu,
       d.last_rssi,
+      d.firmware_version,
       d.device_api_key_last4,
       CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
+      cu.company_name AS owner_company_name,
       (
         SELECT COUNT(*)
         FROM device_schedules s
         WHERE s.device_id = d.device_id AND s.enabled = 1
       ) AS active_schedule_count
     FROM devices d
+    LEFT JOIN client_users cu ON cu.user_id = d.owner_user_id
     ORDER BY d.device_id`
   );
 
@@ -134,26 +156,31 @@ async function listDevices(pool) {
 async function getDeviceDetails(pool, deviceId) {
   const [deviceRows] = await pool.execute(
     `SELECT
-      device_id,
-      name,
-      location,
-      menu_title,
-      sound_enabled,
-      local_sound_enabled,
-      utc_offset_minutes,
-      poll_interval_seconds,
-      last_seen_at,
-      last_ip,
-      last_rssi,
-      firmware_version,
-      current_screen,
-      current_menu,
-      device_api_key_last4,
-      CASE WHEN device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
-      created_at,
-      updated_at
-    FROM devices
-    WHERE device_id = :device_id`,
+      d.device_id,
+      d.owner_user_id,
+      d.name,
+      d.location,
+      d.menu_title,
+      d.hardware_model,
+      d.firmware_profile,
+      d.sound_enabled,
+      d.local_sound_enabled,
+      d.utc_offset_minutes,
+      d.poll_interval_seconds,
+      d.last_seen_at,
+      d.last_ip,
+      d.last_rssi,
+      d.firmware_version,
+      d.current_screen,
+      d.current_menu,
+      d.device_api_key_last4,
+      CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
+      cu.company_name AS owner_company_name,
+      d.created_at,
+      d.updated_at
+    FROM devices d
+    LEFT JOIN client_users cu ON cu.user_id = d.owner_user_id
+    WHERE d.device_id = :device_id`,
     { device_id: deviceId }
   );
 
@@ -185,6 +212,203 @@ async function getDeviceAuthRecord(pool, deviceId) {
 
 async function getDeviceConfig(pool, deviceId) {
   return getDeviceDetails(pool, deviceId);
+}
+
+async function listClientUsers(pool) {
+  const [rows] = await pool.execute(
+    `SELECT
+      cu.user_id,
+      cu.company_name,
+      cu.contact_name,
+      cu.email,
+      cu.status,
+      cu.created_at,
+      cu.updated_at,
+      COUNT(d.device_id) AS device_count
+    FROM client_users cu
+    LEFT JOIN devices d ON d.owner_user_id = cu.user_id
+    GROUP BY
+      cu.user_id,
+      cu.company_name,
+      cu.contact_name,
+      cu.email,
+      cu.status,
+      cu.created_at,
+      cu.updated_at
+    ORDER BY cu.company_name, cu.user_id`
+  );
+
+  return rows.map(formatClientUserRow);
+}
+
+async function getClientUserById(pool, userId) {
+  const [rows] = await pool.execute(
+    `SELECT
+      cu.user_id,
+      cu.company_name,
+      cu.contact_name,
+      cu.email,
+      cu.status,
+      cu.created_at,
+      cu.updated_at,
+      COUNT(d.device_id) AS device_count
+    FROM client_users cu
+    LEFT JOIN devices d ON d.owner_user_id = cu.user_id
+    WHERE cu.user_id = :user_id
+    GROUP BY
+      cu.user_id,
+      cu.company_name,
+      cu.contact_name,
+      cu.email,
+      cu.status,
+      cu.created_at,
+      cu.updated_at`,
+    { user_id: userId }
+  );
+
+  return rows.length ? formatClientUserRow(rows[0]) : null;
+}
+
+async function getClientUserDetails(pool, userId) {
+  const user = await getClientUserById(pool, userId);
+  if (!user) {
+    return null;
+  }
+
+  const [devices] = await pool.execute(
+    `SELECT
+      d.device_id,
+      d.owner_user_id,
+      d.name,
+      d.location,
+      d.menu_title,
+      d.hardware_model,
+      d.firmware_profile,
+      d.sound_enabled,
+      d.local_sound_enabled,
+      d.utc_offset_minutes,
+      d.poll_interval_seconds,
+      d.last_seen_at,
+      d.last_ip,
+      d.last_rssi,
+      d.firmware_version,
+      d.current_screen,
+      d.current_menu,
+      d.device_api_key_last4,
+      CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
+      cu.company_name AS owner_company_name,
+      (
+        SELECT COUNT(*)
+        FROM device_schedules s
+        WHERE s.device_id = d.device_id AND s.enabled = 1
+      ) AS active_schedule_count,
+      d.created_at,
+      d.updated_at
+    FROM devices d
+    LEFT JOIN client_users cu ON cu.user_id = d.owner_user_id
+    WHERE d.owner_user_id = :user_id
+    ORDER BY d.device_id`,
+    { user_id: userId }
+  );
+
+  return {
+    ...user,
+    devices: devices.map(formatDeviceRow),
+  };
+}
+
+async function getClientUserAuthRecordByIdentifier(pool, identifier) {
+  const normalized = String(identifier || "").trim().toLowerCase();
+  const [rows] = await pool.execute(
+    `SELECT
+      user_id,
+      company_name,
+      contact_name,
+      email,
+      password_hash,
+      status
+    FROM client_users
+    WHERE user_id = :identifier OR email = :identifier
+    LIMIT 1`,
+    { identifier: normalized }
+  );
+
+  return rows.length ? rows[0] : null;
+}
+
+async function upsertClientUser(pool, user) {
+  const existing = await getClientUserById(pool, user.user_id);
+  let passwordHash = null;
+  let provisionedPassword = null;
+
+  if (user.password) {
+    provisionedPassword = user.password;
+    passwordHash = hashPassword(user.password);
+  } else if (user.rotate_password || !existing) {
+    provisionedPassword = generatePortalPassword();
+    passwordHash = hashPassword(provisionedPassword);
+  }
+
+  await pool.execute(
+    `INSERT INTO client_users (
+      user_id,
+      company_name,
+      contact_name,
+      email,
+      password_hash,
+      status
+    ) VALUES (
+      :user_id,
+      :company_name,
+      :contact_name,
+      :email,
+      :password_hash,
+      :status
+    )
+    ON DUPLICATE KEY UPDATE
+      company_name = VALUES(company_name),
+      contact_name = VALUES(contact_name),
+      email = VALUES(email),
+      password_hash = COALESCE(VALUES(password_hash), password_hash),
+      status = VALUES(status)`,
+    {
+      user_id: user.user_id,
+      company_name: user.company_name,
+      contact_name: user.contact_name,
+      email: user.email,
+      password_hash: passwordHash,
+      status: user.status,
+    }
+  );
+
+  return {
+    user: await getClientUserDetails(pool, user.user_id),
+    provisioning: provisionedPassword
+      ? {
+          password: provisionedPassword,
+        }
+      : null,
+  };
+}
+
+async function deleteClientUserById(pool, userId) {
+  const existing = await getClientUserDetails(pool, userId);
+  if (!existing) {
+    return null;
+  }
+
+  await pool.execute(
+    `UPDATE devices
+    SET owner_user_id = NULL
+    WHERE owner_user_id = :user_id`,
+    { user_id: userId }
+  );
+
+  await pool.execute("DELETE FROM client_users WHERE user_id = :user_id", {
+    user_id: userId,
+  });
+
+  return existing;
 }
 
 async function deleteDeviceById(pool, deviceId) {
@@ -417,13 +641,22 @@ async function listFirmwareReleases(pool) {
   const [rows] = await pool.execute(
     `SELECT
       fr.id,
+      fr.release_code,
       fr.version,
       fr.channel,
+      fr.target_type,
+      fr.target_user_id,
+      fr.target_device_id,
+      fr.hardware_model,
+      fr.binary_filename,
+      fr.sketch_path,
       fr.firmware_url,
       fr.sha256,
       fr.notes,
       fr.is_active,
       fr.created_at,
+      cu.company_name AS target_user_company_name,
+      d.name AS target_device_name,
       (
         SELECT COUNT(*)
         FROM device_firmware_deployments dfd
@@ -431,6 +664,8 @@ async function listFirmwareReleases(pool) {
           AND dfd.status IN ('pending', 'applying')
       ) AS active_deployments
     FROM firmware_releases fr
+    LEFT JOIN client_users cu ON cu.user_id = fr.target_user_id
+    LEFT JOIN devices d ON d.device_id = fr.target_device_id
     ORDER BY fr.created_at DESC, fr.id DESC`
   );
 
@@ -440,16 +675,33 @@ async function listFirmwareReleases(pool) {
 async function getFirmwareReleaseById(pool, releaseId) {
   const [rows] = await pool.execute(
     `SELECT
-      id,
-      version,
-      channel,
-      firmware_url,
-      sha256,
-      notes,
-      is_active,
-      created_at
-    FROM firmware_releases
-    WHERE id = :id`,
+      fr.id,
+      fr.release_code,
+      fr.version,
+      fr.channel,
+      fr.target_type,
+      fr.target_user_id,
+      fr.target_device_id,
+      fr.hardware_model,
+      fr.binary_filename,
+      fr.sketch_path,
+      fr.firmware_url,
+      fr.sha256,
+      fr.notes,
+      fr.is_active,
+      fr.created_at,
+      cu.company_name AS target_user_company_name,
+      d.name AS target_device_name,
+      (
+        SELECT COUNT(*)
+        FROM device_firmware_deployments dfd
+        WHERE dfd.firmware_release_id = fr.id
+          AND dfd.status IN ('pending', 'applying')
+      ) AS active_deployments
+    FROM firmware_releases fr
+    LEFT JOIN client_users cu ON cu.user_id = fr.target_user_id
+    LEFT JOIN devices d ON d.device_id = fr.target_device_id
+    WHERE fr.id = :id`,
     { id: releaseId }
   );
 
@@ -459,28 +711,56 @@ async function getFirmwareReleaseById(pool, releaseId) {
 async function createFirmwareRelease(pool, release) {
   const [result] = await pool.execute(
     `INSERT INTO firmware_releases (
+      release_code,
       version,
       channel,
+      target_type,
+      target_user_id,
+      target_device_id,
+      hardware_model,
+      binary_filename,
+      sketch_path,
       firmware_url,
       sha256,
       notes,
       is_active
     ) VALUES (
+      :release_code,
       :version,
       :channel,
+      :target_type,
+      :target_user_id,
+      :target_device_id,
+      :hardware_model,
+      :binary_filename,
+      :sketch_path,
       :firmware_url,
       :sha256,
       :notes,
       1
     )
     ON DUPLICATE KEY UPDATE
+      release_code = VALUES(release_code),
       firmware_url = VALUES(firmware_url),
+      target_type = VALUES(target_type),
+      target_user_id = VALUES(target_user_id),
+      target_device_id = VALUES(target_device_id),
+      hardware_model = VALUES(hardware_model),
+      binary_filename = VALUES(binary_filename),
+      sketch_path = VALUES(sketch_path),
       sha256 = VALUES(sha256),
       notes = VALUES(notes),
       is_active = 1`,
     {
+      release_code: release.release_code,
       version: release.version,
       channel: release.channel,
+      target_type: release.target_type,
+      target_user_id: release.target_user_id,
+      target_device_id: release.target_device_id,
+      hardware_model: release.hardware_model,
+      binary_filename: release.binary_filename,
+      sketch_path: release.sketch_path,
       firmware_url: release.firmware_url,
       sha256: release.sha256,
       notes: release.notes,
@@ -494,11 +774,24 @@ async function createFirmwareRelease(pool, release) {
   const [rows] = await pool.execute(
     `SELECT id
     FROM firmware_releases
-    WHERE version = :version AND channel = :channel
+    WHERE version = :version
+      AND channel = :channel
+      AND target_type = :target_type
+      AND (
+        (target_user_id = :target_user_id)
+        OR (target_user_id IS NULL AND :target_user_id IS NULL)
+      )
+      AND (
+        (target_device_id = :target_device_id)
+        OR (target_device_id IS NULL AND :target_device_id IS NULL)
+      )
     LIMIT 1`,
     {
       version: release.version,
       channel: release.channel,
+      target_type: release.target_type,
+      target_user_id: release.target_user_id,
+      target_device_id: release.target_device_id,
     }
   );
 
@@ -584,7 +877,33 @@ async function queueFirmwareDeployment(pool, releaseId, deviceIds) {
   }
 
   let targetDeviceIds = Array.isArray(deviceIds) ? [...new Set(deviceIds)] : [];
-  if (!targetDeviceIds.length) {
+  if (release.target_type === "device" && release.target_device_id) {
+    if (targetDeviceIds.length && !targetDeviceIds.every((deviceId) => deviceId === release.target_device_id)) {
+      return {
+        release,
+        device_ids: [],
+        created: 0,
+        error: "Essa release esta travada para um ESP especifico.",
+      };
+    }
+
+    targetDeviceIds = [release.target_device_id];
+  } else if (release.target_type === "user" && release.target_user_id) {
+    const [rows] = await pool.execute(
+      `SELECT device_id
+      FROM devices
+      WHERE owner_user_id = :owner_user_id
+      ORDER BY device_id`,
+      { owner_user_id: release.target_user_id }
+    );
+
+    const ownedDeviceIds = rows.map((row) => row.device_id);
+    if (targetDeviceIds.length) {
+      targetDeviceIds = targetDeviceIds.filter((deviceId) => ownedDeviceIds.includes(deviceId));
+    } else {
+      targetDeviceIds = ownedDeviceIds;
+    }
+  } else if (!targetDeviceIds.length) {
     const [rows] = await pool.execute("SELECT device_id FROM devices ORDER BY device_id");
     targetDeviceIds = rows.map((row) => row.device_id);
   }
@@ -865,9 +1184,13 @@ async function getLatestDeploymentForDevice(pool, deviceId, statuses) {
 function formatDeviceRow(row) {
   return {
     device_id: row.device_id,
+    owner_user_id: row.owner_user_id || null,
+    owner_company_name: row.owner_company_name || null,
     name: row.name,
     location: row.location,
     menu_title: row.menu_title,
+    hardware_model: row.hardware_model || "lolin_d1_mini",
+    firmware_profile: row.firmware_profile || row.device_id,
     sound_enabled: Boolean(row.sound_enabled),
     local_sound_enabled:
       row.local_sound_enabled === null || row.local_sound_enabled === undefined
@@ -884,6 +1207,19 @@ function formatDeviceRow(row) {
     active_schedule_count: row.active_schedule_count,
     has_device_api_key: Boolean(row.has_device_api_key),
     device_api_key_last4: row.device_api_key_last4 || null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function formatClientUserRow(row) {
+  return {
+    user_id: row.user_id,
+    company_name: row.company_name,
+    contact_name: row.contact_name || null,
+    email: row.email,
+    status: row.status,
+    device_count: Number(row.device_count || 0),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -914,8 +1250,17 @@ function formatScheduleRow(row) {
 function formatFirmwareReleaseRow(row) {
   return {
     id: row.id,
+    release_code: row.release_code,
     version: row.version,
     channel: row.channel,
+    target_type: row.target_type || "all",
+    target_user_id: row.target_user_id || null,
+    target_user_company_name: row.target_user_company_name || null,
+    target_device_id: row.target_device_id || null,
+    target_device_name: row.target_device_name || null,
+    hardware_model: row.hardware_model || "lolin_d1_mini",
+    binary_filename: row.binary_filename || null,
+    sketch_path: row.sketch_path || null,
     firmware_url: row.firmware_url,
     sha256: row.sha256 || null,
     notes: row.notes || null,
@@ -947,11 +1292,15 @@ function formatFirmwareDeploymentRow(row) {
 
 module.exports = {
   cancelFirmwareDeployment,
+  deleteClientUserById,
   createFirmwareRelease,
   createDatabasePool,
-  upsertDevice,
   deleteDeviceById,
+  getClientUserAuthRecordByIdentifier,
+  getClientUserById,
+  getClientUserDetails,
   getDeveloperDeviceDetails,
+  listClientUsers,
   listDevices,
   listDeveloperDevices,
   listFirmwareReleases,
@@ -969,6 +1318,8 @@ module.exports = {
   updateSchedule,
   updateScheduleEnabled,
   deleteSchedule,
+  upsertClientUser,
+  upsertDevice,
   updateDeviceHeartbeat,
   insertDeviceEvent,
 };

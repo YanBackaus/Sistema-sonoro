@@ -12,15 +12,32 @@ function normalizeDeviceId(value, fieldName = "device_id") {
   return deviceId;
 }
 
+function normalizeUserId(value, fieldName = "user_id") {
+  const userId = String(value || "").trim().toLowerCase();
+
+  if (!userId) {
+    throw new ValidationError(`${fieldName} is required.`);
+  }
+
+  if (!/^[a-z0-9_-]{3,64}$/.test(userId)) {
+    throw new ValidationError(`${fieldName} must contain only lowercase letters, numbers, underscore or hyphen.`);
+  }
+
+  return userId;
+}
+
 function normalizeDevicePayload(payload, defaults) {
   const device_id = normalizeDeviceId(payload.device_id);
   const name = normalizeString(payload.name, 80) || device_id;
 
   return {
     device_id,
+    owner_user_id: normalizeOptionalUserId(payload.owner_user_id),
     name,
     location: normalizeString(payload.location, 120),
     menu_title: normalizeString(payload.menu_title, 80) || name,
+    hardware_model: normalizeString(payload.hardware_model, 64) || "lolin_d1_mini",
+    firmware_profile: normalizeString(payload.firmware_profile, 80) || device_id,
     sound_enabled: normalizeBoolean(payload.sound_enabled, true),
     utc_offset_minutes: normalizeInteger(
       payload.utc_offset_minutes,
@@ -36,6 +53,26 @@ function normalizeDevicePayload(payload, defaults) {
     ),
     device_api_key: normalizeOptionalDeviceApiKey(payload.device_api_key),
     rotate_device_api_key: normalizeBoolean(payload.rotate_device_api_key, false),
+  };
+}
+
+function normalizeUserPayload(payload) {
+  const user_id = normalizeUserId(payload.user_id);
+  const company_name = normalizeString(payload.company_name, 120);
+  const email = normalizeEmail(payload.email);
+
+  if (!company_name) {
+    throw new ValidationError("company_name is required.");
+  }
+
+  return {
+    user_id,
+    company_name,
+    contact_name: normalizeString(payload.contact_name, 80),
+    email,
+    password: normalizeOptionalPassword(payload.password),
+    rotate_password: normalizeBoolean(payload.rotate_password, false),
+    status: normalizeUserStatus(payload.status),
   };
 }
 
@@ -97,6 +134,21 @@ function normalizeDeveloperPasswordPayload(payload) {
   return { password };
 }
 
+function normalizeClientSessionPayload(payload) {
+  const identifier = normalizeString(payload.identifier, 160);
+  const password = normalizeString(payload.password, 256);
+
+  if (!identifier) {
+    throw new ValidationError("identifier is required.");
+  }
+
+  if (!password) {
+    throw new ValidationError("password is required.");
+  }
+
+  return { identifier, password };
+}
+
 function normalizeFirmwareReleasePayload(payload) {
   const version = normalizeString(payload.version, 32);
   if (!version) {
@@ -109,8 +161,15 @@ function normalizeFirmwareReleasePayload(payload) {
   }
 
   return {
+    release_code: normalizeReleaseCode(payload.release_code, version, payload.channel),
     version,
     channel: normalizeString(payload.channel, 32) || "stable",
+    target_type: normalizeTargetType(payload.target_type),
+    target_user_id: normalizeOptionalUserId(payload.target_user_id),
+    target_device_id: normalizeOptionalDeviceId(payload.target_device_id),
+    hardware_model: normalizeString(payload.hardware_model, 64) || "lolin_d1_mini",
+    binary_filename: normalizeString(payload.binary_filename, 160),
+    sketch_path: normalizeString(payload.sketch_path, 255),
     firmware_url,
     sha256: normalizeOptionalSha256(payload.sha256),
     notes: normalizeString(payload.notes, 2000),
@@ -124,6 +183,20 @@ function normalizeFirmwareDeploymentPayload(payload) {
 
   return {
     device_ids: deviceIds,
+  };
+}
+
+function normalizeBuildPlanPayload(payload) {
+  const device_id = normalizeDeviceId(payload.device_id);
+  const version = normalizeString(payload.version, 32);
+  if (!version) {
+    throw new ValidationError("version is required.");
+  }
+
+  return {
+    device_id,
+    version,
+    channel: normalizeString(payload.channel, 32) || "stable",
   };
 }
 
@@ -244,6 +317,83 @@ function normalizeOptionalDeviceApiKey(value) {
   return normalized;
 }
 
+function normalizeOptionalUserId(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  return normalizeUserId(value, "owner_user_id");
+}
+
+function normalizeOptionalDeviceId(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  return normalizeDeviceId(value, "target_device_id");
+}
+
+function normalizeEmail(value) {
+  const normalized = normalizeString(value, 160);
+  if (!normalized) {
+    throw new ValidationError("email is required.");
+  }
+
+  const email = normalized.toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ValidationError("email must be valid.");
+  }
+
+  return email;
+}
+
+function normalizeOptionalPassword(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (normalized.length < 8 || normalized.length > 128) {
+    throw new ValidationError("password must have between 8 and 128 characters.");
+  }
+
+  return normalized;
+}
+
+function normalizeUserStatus(value) {
+  const normalized = normalizeString(value, 20) || "active";
+  if (!["active", "paused"].includes(normalized)) {
+    throw new ValidationError("status must be active or paused.");
+  }
+
+  return normalized;
+}
+
+function normalizeTargetType(value) {
+  const normalized = normalizeString(value, 16) || "all";
+  if (!["all", "user", "device"].includes(normalized)) {
+    throw new ValidationError("target_type must be all, user or device.");
+  }
+
+  return normalized;
+}
+
+function normalizeReleaseCode(value, version, channel) {
+  const normalized = normalizeString(value, 80);
+  const candidate = normalized || `${String(channel || "stable").toLowerCase()}-${String(version || "").toLowerCase()}`;
+  const slug = candidate
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  if (!slug) {
+    throw new ValidationError("release_code is required.");
+  }
+
+  return slug;
+}
+
 function normalizeFirmwareUrl(value) {
   const normalized = normalizeString(value, 255);
   if (!normalized) {
@@ -282,6 +432,8 @@ class ValidationError extends Error {}
 
 module.exports = {
   ValidationError,
+  normalizeBuildPlanPayload,
+  normalizeClientSessionPayload,
   normalizeDeviceId,
   normalizeDevicePayload,
   normalizeDeveloperPasswordPayload,
@@ -290,6 +442,8 @@ module.exports = {
   normalizeEventPayload,
   normalizeFirmwareDeploymentPayload,
   normalizeFirmwareReleasePayload,
+  normalizeUserId,
+  normalizeUserPayload,
   normalizeScheduleId,
   normalizeBoolean,
 };

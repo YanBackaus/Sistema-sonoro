@@ -13,44 +13,48 @@
   <div class="page-shell">
     <header class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Painel</p>
-        <h1>Gerencie horários</h1>
-        <p class="hero-text">Ajuste os ESPs e os toques em um só lugar.</p>
+        <p class="eyebrow">Painel do cliente</p>
+        <h1>Gerencie horarios</h1>
+        <p class="hero-text">Veja apenas os ESPs ligados a sua conta e ajuste a agenda de cada um sem precisar mexer no cadastro do hardware.</p>
       </div>
 
       <div class="hero-panel surface">
         <div class="status-row">
           <span class="badge" id="apiBadge">API: aguardando</span>
           <span class="badge badge-muted" id="browserBadge">Navegador: online</span>
+          <span class="badge badge-muted" id="sessionBadge">Sessao: fechada</span>
         </div>
 
-        <label class="field">
-          <span>URL da API</span>
-          <input
-            id="apiBaseUrlInput"
-            type="text"
-            placeholder="http://localhost:3000"
-            autocomplete="off"
-          >
-        </label>
+        <div class="session-stack" id="loginPanel">
+          <label class="field">
+            <span>Usuario ou e-mail</span>
+            <input id="identifierInput" type="text" placeholder="empresa_alpha ou contato@empresa.com" autocomplete="username">
+          </label>
 
-        <label class="field">
-          <span>Chave da API</span>
-          <input
-            id="apiKeyInput"
-            type="password"
-            placeholder="Chave do admin"
-            autocomplete="off"
-          >
-        </label>
+          <label class="field">
+            <span>Senha</span>
+            <input id="passwordInput" type="password" placeholder="Senha da sua conta" autocomplete="current-password">
+          </label>
 
-        <div class="inline-actions">
-          <button id="connectButton" type="button">Conectar</button>
-          <button id="refreshButton" type="button" class="button-secondary">Atualizar</button>
+          <div class="inline-actions">
+            <button id="loginButton" type="button">Entrar</button>
+          </div>
+        </div>
+
+        <div class="session-stack" id="sessionPanel" hidden>
+          <div class="session-summary">
+            <strong id="sessionCompanyName">Conta conectada</strong>
+            <p id="sessionMeta">Use este painel para cuidar da agenda dos seus ESPs.</p>
+          </div>
+
+          <div class="inline-actions">
+            <button id="refreshButton" type="button">Atualizar</button>
+            <button id="logoutButton" type="button" class="button-secondary">Sair</button>
+          </div>
         </div>
 
         <p class="hint" id="configHint">
-          Informe a chave da API para continuar.
+          Entre com seu usuario para listar os ESPs vinculados a sua conta.
         </p>
       </div>
     </header>
@@ -59,12 +63,12 @@
       <aside class="surface device-rail reveal">
         <div class="section-head">
           <div>
-            <p class="section-kicker">ESPs</p>
-            <h2>Lista de ESPs</h2>
+            <p class="section-kicker">Seus ESPs</p>
+            <h2>Lista de dispositivos</h2>
           </div>
           <span class="live-dot-wrap">
             <span class="live-dot"></span>
-            <span id="deviceStatusText">Aguardando conexão</span>
+            <span id="deviceStatusText">Aguardando login</span>
           </span>
         </div>
 
@@ -76,12 +80,12 @@
         <label class="field compact-select">
           <span>Escolher ESP</span>
           <select id="deviceSelect">
-            <option value="">Conecte para ver</option>
+            <option value="">Entre para ver</option>
           </select>
         </label>
 
         <div class="device-card-list" id="deviceCardList">
-          <div class="empty-state">Conecte-se à API para ver os ESPs.</div>
+          <div class="empty-state">Entre com sua conta para ver os ESPs liberados para voce.</div>
         </div>
       </aside>
 
@@ -89,10 +93,10 @@
         <section class="surface workspace-hero reveal">
           <div class="section-head">
             <div>
-              <p class="section-kicker">Agenda independente</p>
+              <p class="section-kicker">Agenda do ESP</p>
               <h2 id="selectedDeviceHeading">Selecione um ESP</h2>
               <p class="workspace-note" id="selectedDeviceContext">
-                Escolha um ESP para ver e editar os horários dele.
+                Escolha um ESP da lista para ver a agenda e editar os horarios dele.
               </p>
             </div>
             <span class="editor-badge" id="workspaceScopeBadge">Sem ESP</span>
@@ -104,15 +108,15 @@
               <strong id="summaryConnectionStatus">--</strong>
             </div>
             <div class="stat-pill">
-              <span>Horários totais</span>
+              <span>Horarios totais</span>
               <strong id="summaryTotalSchedules">--</strong>
             </div>
             <div class="stat-pill">
-              <span>Horários ativos</span>
+              <span>Horarios ativos</span>
               <strong id="summaryActiveSchedules">--</strong>
             </div>
             <div class="stat-pill">
-              <span>Próximo toque</span>
+              <span>Proximo toque</span>
               <strong id="summaryNextAlarm">--</strong>
             </div>
           </div>
@@ -122,73 +126,78 @@
           <article class="surface panel-card reveal">
             <div class="section-head">
               <div>
-                <p class="section-kicker">Dados do ESP</p>
-                <h2>Informações básicas</h2>
+                <p class="section-kicker">Conta</p>
+                <h2>Seu acesso</h2>
               </div>
             </div>
 
-            <form id="deviceForm" class="stack-form">
-              <div class="field-grid">
-                <label class="field">
-                  <span>ID do ESP</span>
-                  <input id="deviceIdInput" type="text" placeholder="d1mini_02" autocomplete="off" required>
-                </label>
-
-                <label class="field">
-                  <span>Nome</span>
-                  <input id="deviceNameInput" type="text" placeholder="Corredor" autocomplete="off">
-                </label>
+            <div class="summary-list" id="accountSummary">
+              <div>
+                <dt>Empresa</dt>
+                <dd id="accountCompany">--</dd>
               </div>
-
-              <div class="field-grid">
-                <label class="field">
-                  <span>Local</span>
-                  <input id="deviceLocationInput" type="text" placeholder="Bloco A" autocomplete="off">
-                </label>
-
-                <label class="field">
-                  <span>Menu</span>
-                  <input id="deviceMenuTitleInput" type="text" placeholder="Corredor" autocomplete="off">
-                </label>
+              <div>
+                <dt>Usuario</dt>
+                <dd id="accountUserId">--</dd>
               </div>
-
-              <label class="field">
-                <span>Nova chave (opcional)</span>
-                <input
-                  id="deviceApiKeyInput"
-                  type="password"
-                  placeholder="Deixe em branco para manter a atual"
-                  autocomplete="off"
-                >
-              </label>
-
-              <label class="toggle">
-                <input id="rotateDeviceApiKeyInput" type="checkbox">
-                <span>Gerar chave nova ao salvar</span>
-              </label>
-
-              <p class="hint">
-                Cada ESP usa sua própria chave. A chave do painel não vai para a placa.
-              </p>
-
-              <div class="provisioning-panel" id="deviceProvisioningPanel" hidden>
-                <p class="section-kicker">Chave do ESP</p>
-                <strong>Use esta chave no firmware</strong>
-                <code id="deviceProvisioningValue" class="provisioning-value"></code>
-                <p class="hint">
-                  Guarde agora. Ela só aparece quando for criada ou trocada.
-                </p>
+              <div>
+                <dt>E-mail</dt>
+                <dd id="accountEmail">--</dd>
               </div>
+              <div>
+                <dt>ESPs liberados</dt>
+                <dd id="accountDeviceCount">--</dd>
+              </div>
+            </div>
 
-              <button type="submit">Salvar ESP</button>
-            </form>
+            <div class="section-head section-head-spaced">
+              <div>
+                <p class="section-kicker">ESP selecionado</p>
+                <h2>Informacoes basicas</h2>
+              </div>
+            </div>
+
+            <dl class="summary-list">
+              <div>
+                <dt>ID do ESP</dt>
+                <dd id="summaryDeviceId">--</dd>
+              </div>
+              <div>
+                <dt>Nome</dt>
+                <dd id="summaryName">--</dd>
+              </div>
+              <div>
+                <dt>Local</dt>
+                <dd id="summaryLocation">--</dd>
+              </div>
+              <div>
+                <dt>Menu</dt>
+                <dd id="summaryMenuTitle">--</dd>
+              </div>
+              <div>
+                <dt>Ultima conexao</dt>
+                <dd id="summaryLastSeen">--</dd>
+              </div>
+              <div>
+                <dt>Som remoto</dt>
+                <dd id="summarySoundEnabled">--</dd>
+              </div>
+              <div>
+                <dt>Som local</dt>
+                <dd id="summaryLocalSound">--</dd>
+              </div>
+              <div>
+                <dt>Chave do ESP</dt>
+                <dd id="summaryDeviceKey">--</dd>
+              </div>
+            </dl>
           </article>
 
           <article class="surface panel-card reveal">
             <div class="section-head">
               <div>
-                <p class="section-kicker" id="scheduleFormKicker">Novo horário</p>
-                <h2 id="scheduleFormTitle">Cadastro rápido</h2>
+                <p class="section-kicker" id="scheduleFormKicker">Novo horario</p>
+                <h2 id="scheduleFormTitle">Cadastro rapido</h2>
               </div>
               <span class="editor-badge" id="scheduleEditorBadge" hidden>Criando</span>
             </div>
@@ -196,7 +205,7 @@
             <form id="scheduleForm" class="stack-form">
               <div class="field-grid field-grid-wide">
                 <label class="field">
-                  <span>Descrição</span>
+                  <span>Descricao</span>
                   <input id="scheduleLabelInput" type="text" placeholder="Entrada" autocomplete="off" required>
                 </label>
 
@@ -226,17 +235,17 @@
 
               <div class="field-grid">
                 <label class="field">
-                  <span>Frequência (Hz)</span>
+                  <span>Frequencia (Hz)</span>
                   <input id="toneHzInput" type="number" min="100" max="6000" value="2400" required>
                 </label>
 
                 <label class="field">
-                  <span>Duração (ms)</span>
+                  <span>Duracao (ms)</span>
                   <input id="toneMsInput" type="number" min="50" max="10000" value="600" required>
                 </label>
 
                 <label class="field">
-                  <span>Repetições</span>
+                  <span>Repeticoes</span>
                   <input id="repeatCountInput" type="number" min="1" max="10" value="1" required>
                 </label>
 
@@ -248,65 +257,29 @@
 
               <label class="toggle">
                 <input id="enabledInput" type="checkbox" checked>
-                <span>Horário ativo</span>
+                <span>Horario ativo</span>
               </label>
 
               <div class="inline-actions">
-                <button id="saveScheduleButton" type="submit">Cadastrar horário</button>
+                <button id="saveScheduleButton" type="submit">Cadastrar horario</button>
                 <button id="resetScheduleButton" type="button" class="button-secondary">Limpar</button>
               </div>
             </form>
           </article>
         </section>
 
-        <section class="surface panel-card reveal summary-panel">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Resumo do ESP</p>
-              <h2>Dados rápidos</h2>
-            </div>
-          </div>
-
-          <dl class="summary-list">
-            <div>
-              <dt>Nome</dt>
-              <dd id="summaryName">--</dd>
-            </div>
-            <div>
-              <dt>Local</dt>
-              <dd id="summaryLocation">--</dd>
-            </div>
-            <div>
-              <dt>Última conexão</dt>
-              <dd id="summaryLastSeen">--</dd>
-            </div>
-            <div>
-              <dt>Som remoto</dt>
-              <dd id="summarySoundEnabled">--</dd>
-            </div>
-            <div>
-              <dt>Som local</dt>
-              <dd id="summaryLocalSound">--</dd>
-            </div>
-            <div>
-              <dt>Chave do ESP</dt>
-              <dd id="summaryDeviceKey">--</dd>
-            </div>
-          </dl>
-        </section>
-
         <section class="surface history-panel reveal">
           <div class="section-head">
             <div>
               <p class="section-kicker">Agenda ativa</p>
-              <h2>Horários deste ESP</h2>
+              <h2>Horarios deste ESP</h2>
             </div>
-            <p class="history-note" id="scheduleCountNote">Nenhum horário carregado.</p>
+            <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
           </div>
 
           <div id="flashMessage" class="flash-message" hidden></div>
           <div class="history-list" id="scheduleList">
-            <div class="empty-state">Conecte-se à API para carregar os horários.</div>
+            <div class="empty-state">Entre com sua conta para carregar os horarios.</div>
           </div>
         </section>
       </div>

@@ -4,6 +4,10 @@ function generateDeviceApiKey() {
   return `d1k_${crypto.randomBytes(24).toString("base64url")}`;
 }
 
+function generatePortalPassword() {
+  return `usr_${crypto.randomBytes(18).toString("base64url")}`;
+}
+
 function hashDeviceApiKey(deviceApiKey, pepper) {
   return crypto.createHmac("sha256", pepper).update(String(deviceApiKey)).digest("hex");
 }
@@ -69,12 +73,36 @@ function signSessionBody(body, secret) {
   return crypto.createHmac("sha256", secret).update(body).digest("base64url");
 }
 
+function hashPassword(password) {
+  const normalized = String(password || "");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.scryptSync(normalized, salt, 64).toString("hex");
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyPassword(candidate, storedHash) {
+  const normalizedHash = String(storedHash || "");
+  const parts = normalizedHash.split("$");
+  if (parts.length !== 3 || parts[0] !== "scrypt") {
+    return false;
+  }
+
+  const candidateHash = crypto
+    .scryptSync(String(candidate || ""), parts[1], 64)
+    .toString("hex");
+
+  return timingSafeEqualText(parts[2], candidateHash);
+}
+
 module.exports = {
   createSignedSessionToken,
   generateDeviceApiKey,
+  generatePortalPassword,
   getKeyLast4,
   hashDeviceApiKey,
+  hashPassword,
   timingSafeEqualText,
   verifyDeviceApiKey,
+  verifyPassword,
   verifySignedSessionToken,
 };
