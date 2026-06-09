@@ -59,7 +59,6 @@ function normalizeDevicePayload(payload, defaults) {
 function normalizeUserPayload(payload) {
   const user_id = normalizeUserId(payload.user_id);
   const company_name = normalizeString(payload.company_name, 120);
-  const email = normalizeEmail(payload.email);
 
   if (!company_name) {
     throw new ValidationError("company_name is required.");
@@ -69,7 +68,7 @@ function normalizeUserPayload(payload) {
     user_id,
     company_name,
     contact_name: normalizeString(payload.contact_name, 80),
-    email,
+    email: normalizeOptionalEmail(payload.email),
     password: normalizeOptionalPassword(payload.password),
     rotate_password: normalizeBoolean(payload.rotate_password, false),
     status: normalizeUserStatus(payload.status),
@@ -135,18 +134,29 @@ function normalizeDeveloperPasswordPayload(payload) {
 }
 
 function normalizeClientSessionPayload(payload) {
-  const identifier = normalizeString(payload.identifier, 160);
+  const user_id = normalizeUserId(payload.user_id ?? payload.identifier, "user_id");
   const password = normalizeString(payload.password, 256);
-
-  if (!identifier) {
-    throw new ValidationError("identifier is required.");
-  }
 
   if (!password) {
     throw new ValidationError("password is required.");
   }
 
-  return { identifier, password };
+  return { user_id, password };
+}
+
+function normalizeClientPasswordChangePayload(payload) {
+  const current_password = normalizeString(payload.current_password, 256);
+  const new_password = normalizeOptionalPassword(payload.new_password);
+
+  if (!current_password) {
+    throw new ValidationError("current_password is required.");
+  }
+
+  if (!new_password) {
+    throw new ValidationError("new_password is required.");
+  }
+
+  return { current_password, new_password };
 }
 
 function normalizeFirmwareReleasePayload(payload) {
@@ -333,10 +343,10 @@ function normalizeOptionalDeviceId(value) {
   return normalizeDeviceId(value, "target_device_id");
 }
 
-function normalizeEmail(value) {
+function normalizeOptionalEmail(value) {
   const normalized = normalizeString(value, 160);
   if (!normalized) {
-    throw new ValidationError("email is required.");
+    return null;
   }
 
   const email = normalized.toLowerCase();
@@ -433,6 +443,7 @@ class ValidationError extends Error {}
 module.exports = {
   ValidationError,
   normalizeBuildPlanPayload,
+  normalizeClientPasswordChangePayload,
   normalizeClientSessionPayload,
   normalizeDeviceId,
   normalizeDevicePayload,

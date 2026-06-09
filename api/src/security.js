@@ -5,7 +5,14 @@ function generateDeviceApiKey() {
 }
 
 function generatePortalPassword() {
-  return `usr_${crypto.randomBytes(18).toString("base64url")}`;
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let suffix = "";
+
+  for (let index = 0; index < 6; index += 1) {
+    suffix += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+
+  return `Haxis-${suffix}`;
 }
 
 function hashDeviceApiKey(deviceApiKey, pepper) {

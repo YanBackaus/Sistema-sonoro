@@ -13,6 +13,7 @@ const {
   getClientUserDetails,
   getDeveloperDeviceDetails,
   listClientUsers,
+  updateClientUserPassword,
   upsertDevice,
   upsertClientUser,
   listDeveloperDevices,
@@ -44,6 +45,7 @@ const {
 const {
   ValidationError,
   normalizeBuildPlanPayload,
+  normalizeClientPasswordChangePayload,
   normalizeClientSessionPayload,
   normalizeDeviceId,
   normalizeDeveloperPasswordPayload,
@@ -108,6 +110,7 @@ app.get("/", (request, response) => {
       schedules: "GET/POST /api/devices/:deviceId/schedules",
       scheduleEdit: "PUT/PATCH/DELETE /api/devices/:deviceId/schedules/:scheduleId",
       clientSession: "POST /api/client/session",
+      clientPassword: "PUT /api/client/session/password",
       developer: "GET /developer/login",
       developerBuildPlan: "POST /api/developer/build-plan",
     },
@@ -224,8 +227,8 @@ app.get("/api/developer/overview", requireDeveloperSession, async (request, resp
 
 app.post("/api/client/session", async (request, response) => {
   try {
-    const { identifier, password } = normalizeClientSessionPayload(request.body || {});
-    const authRecord = await getClientUserAuthRecordByIdentifier(pool, identifier);
+    const { user_id, password } = normalizeClientSessionPayload(request.body || {});
+    const authRecord = await getClientUserAuthRecordByIdentifier(pool, user_id);
     const isAuthorized =
       authRecord &&
       authRecord.status === "active" &&
@@ -239,22 +242,18 @@ app.post("/api/client/session", async (request, response) => {
       return;
     }
 
-    const expiresAt = new Date(Date.now() + config.clientSessionTtlHours * 60 * 60 * 1000);
-    const token = createSignedSessionToken(
-      {
-        role: "client",
-        user_id: authRecord.user_id,
-        exp: expiresAt.toISOString(),
-      },
-      config.clientSessionSecret
-    );
+    const user = await getClientUserDetails(pool, authRecord.user_id);
+    if (!user) {
+      response.status(404).json({
+        ok: false,
+        error: "Usuario nao encontrado.",
+      });
+      return;
+    }
 
-    response.setHeader("Set-Cookie", serializeSessionCookie(CLIENT_SESSION_COOKIE, token, request, expiresAt));
-    response.json({
-      ok: true,
-      user: await getClientUserDetails(pool, authRecord.user_id),
-      expires_at: expiresAt.toISOString(),
-    });
+    const expiresAt = createClientSessionExpiry();
+    response.setHeader("Set-Cookie", serializeClientSessionCookie(user, request, expiresAt));
+    response.json(buildClientSessionResponse(user, expiresAt));
   } catch (error) {
     handleApiError(error, response);
   }
@@ -271,11 +270,53 @@ app.get("/api/client/session", requireClientSession, async (request, response) =
       return;
     }
 
-    response.json({
-      ok: true,
-      user,
-      expires_at: request.clientSession.exp,
-    });
+    response.json(buildClientSessionResponse(user, request.clientSession.exp));
+  } catch (error) {
+    handleApiError(error, response);
+  }
+});
+
+app.put("/api/client/session/password", requireClientSession, async (request, response) => {
+  try {
+    const { current_password, new_password } = normalizeClientPasswordChangePayload(request.body || {});
+    const authRecord = await getClientUserAuthRecordByIdentifier(pool, request.clientSession.user_id);
+
+    if (!authRecord || authRecord.status !== "active") {
+      response.status(404).json({
+        ok: false,
+        error: "Usuario nao encontrado.",
+      });
+      return;
+    }
+
+    if (!verifyPassword(current_password, authRecord.password_hash)) {
+      response.status(401).json({
+        ok: false,
+        error: "Senha atual invalida.",
+      });
+      return;
+    }
+
+    if (current_password === new_password) {
+      response.status(422).json({
+        ok: false,
+        error: "A nova senha precisa ser diferente da atual.",
+      });
+      return;
+    }
+
+    const user = await updateClientUserPassword(pool, request.clientSession.user_id, new_password, false);
+    if (!user) {
+      response.status(404).json({
+        ok: false,
+        error: "Usuario nao encontrado.",
+      });
+      return;
+    }
+
+    const expiresAt = createClientSessionExpiry();
+    response.setHeader("Set-Cookie", serializeClientSessionCookie(user, request, expiresAt));
+    response.json(buildClientSessionResponse(user, expiresAt));
   } catch (error) {
     handleApiError(error, response);
   }
@@ -288,27 +329,18 @@ app.delete("/api/client/session", (request, response) => {
   });
 });
 
-app.get("/api/client/devices", requireClientSession, async (request, response) => {
+app.get("/api/client/devices", requireClientReadySession, async (request, response) => {
   try {
-    const user = await getClientUserDetails(pool, request.clientSession.user_id);
-    if (!user) {
-      response.status(404).json({
-        ok: false,
-        error: "Usuario nao encontrado.",
-      });
-      return;
-    }
-
     response.json({
       ok: true,
-      devices: user.devices || [],
+      devices: request.clientUser.devices || [],
     });
   } catch (error) {
     handleApiError(error, response);
   }
 });
 
-app.get("/api/client/devices/:deviceId", requireClientSession, async (request, response) => {
+app.get("/api/client/devices/:deviceId", requireClientReadySession, async (request, response) => {
   try {
     const device = await getClientOwnedDevice(request, response);
     if (!device) {
@@ -324,7 +356,7 @@ app.get("/api/client/devices/:deviceId", requireClientSession, async (request, r
   }
 });
 
-app.get("/api/client/devices/:deviceId/schedules", requireClientSession, async (request, response) => {
+app.get("/api/client/devices/:deviceId/schedules", requireClientReadySession, async (request, response) => {
   try {
     const device = await getClientOwnedDevice(request, response);
     if (!device) {
@@ -341,7 +373,7 @@ app.get("/api/client/devices/:deviceId/schedules", requireClientSession, async (
   }
 });
 
-app.post("/api/client/devices/:deviceId/schedules", requireClientSession, async (request, response) => {
+app.post("/api/client/devices/:deviceId/schedules", requireClientReadySession, async (request, response) => {
   try {
     const device = await getClientOwnedDevice(request, response);
     if (!device) {
@@ -360,7 +392,7 @@ app.post("/api/client/devices/:deviceId/schedules", requireClientSession, async 
   }
 });
 
-app.put("/api/client/devices/:deviceId/schedules/:scheduleId", requireClientSession, async (request, response) => {
+app.put("/api/client/devices/:deviceId/schedules/:scheduleId", requireClientReadySession, async (request, response) => {
   try {
     const device = await getClientOwnedDevice(request, response);
     if (!device) {
@@ -390,7 +422,7 @@ app.put("/api/client/devices/:deviceId/schedules/:scheduleId", requireClientSess
 
 app.patch(
   "/api/client/devices/:deviceId/schedules/:scheduleId/enabled",
-  requireClientSession,
+  requireClientReadySession,
   async (request, response) => {
     try {
       const device = await getClientOwnedDevice(request, response);
@@ -422,7 +454,7 @@ app.patch(
 
 app.delete(
   "/api/client/devices/:deviceId/schedules/:scheduleId",
-  requireClientSession,
+  requireClientReadySession,
   async (request, response) => {
     try {
       const device = await getClientOwnedDevice(request, response);
@@ -1140,6 +1172,54 @@ function requireClientSession(request, response, next) {
   next();
 }
 
+async function requireClientReadySession(request, response, next) {
+  const session = getClientSession(request);
+  if (!session) {
+    response.status(401).json({
+      ok: false,
+      error: "Sessao do cliente obrigatoria.",
+    });
+    return;
+  }
+
+  try {
+    const user = await getClientUserDetails(pool, session.user_id);
+    if (!user) {
+      response.status(404).json({
+        ok: false,
+        error: "Usuario nao encontrado.",
+      });
+      return;
+    }
+
+    if (user.status !== "active") {
+      response.status(403).json({
+        ok: false,
+        error: "Conta pausada.",
+      });
+      return;
+    }
+
+    if (user.password_temporary) {
+      response.status(403).json({
+        ok: false,
+        error: "Troque a senha provisoria para continuar.",
+        requires_password_change: true,
+      });
+      return;
+    }
+
+    request.clientSession = {
+      ...session,
+      password_temporary: false,
+    };
+    request.clientUser = user;
+    next();
+  } catch (error) {
+    handleApiError(error, response);
+  }
+}
+
 async function getClientOwnedDevice(request, response) {
   const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
   const device = await getDeviceDetails(pool, deviceId);
@@ -1212,6 +1292,40 @@ function getClientSession(request) {
   return getSignedSessionFromRequest(request, CLIENT_SESSION_COOKIE, config.clientSessionSecret, "client");
 }
 
+function createClientSessionExpiry() {
+  return new Date(Date.now() + config.clientSessionTtlHours * 60 * 60 * 1000);
+}
+
+function createClientSessionToken(user, expiresAt) {
+  return createSignedSessionToken(
+    {
+      role: "client",
+      user_id: user.user_id,
+      password_temporary: Boolean(user.password_temporary),
+      exp: normalizeSessionExpiry(expiresAt),
+    },
+    config.clientSessionSecret
+  );
+}
+
+function serializeClientSessionCookie(user, request, expiresAt) {
+  return serializeSessionCookie(
+    CLIENT_SESSION_COOKIE,
+    createClientSessionToken(user, expiresAt),
+    request,
+    new Date(normalizeSessionExpiry(expiresAt))
+  );
+}
+
+function buildClientSessionResponse(user, expiresAt) {
+  return {
+    ok: true,
+    user,
+    expires_at: normalizeSessionExpiry(expiresAt),
+    requires_password_change: Boolean(user?.password_temporary),
+  };
+}
+
 function getSignedSessionFromRequest(request, cookieName, secret, role) {
   const cookies = parseCookies(request.headers.cookie);
   const token = cookies[cookieName];
@@ -1230,6 +1344,19 @@ function getSignedSessionFromRequest(request, cookieName, secret, role) {
   }
 
   return payload;
+}
+
+function normalizeSessionExpiry(value) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return parsed.toISOString();
 }
 
 function parseCookies(cookieHeader) {

@@ -17,14 +17,15 @@ const elements = {
   userIdInput: document.querySelector("#developerUserIdInput"),
   userCompanyInput: document.querySelector("#developerUserCompanyInput"),
   userContactInput: document.querySelector("#developerUserContactInput"),
-  userEmailInput: document.querySelector("#developerUserEmailInput"),
   userPasswordInput: document.querySelector("#developerUserPasswordInput"),
   userRotatePasswordInput: document.querySelector("#developerUserRotatePasswordInput"),
   userStatusInput: document.querySelector("#developerUserStatusInput"),
   userResetButton: document.querySelector("#developerUserResetButton"),
   userDeleteButton: document.querySelector("#developerUserDeleteButton"),
   userProvisioningCard: document.querySelector("#developerUserProvisioningCard"),
+  userProvisioningTitle: document.querySelector("#developerUserProvisioningTitle"),
   userProvisioningValue: document.querySelector("#developerUserProvisioningValue"),
+  userProvisioningHint: document.querySelector("#developerUserProvisioningHint"),
   userSummary: document.querySelector("#developerUserSummary"),
 
   deviceList: document.querySelector("#developerDeviceList"),
@@ -46,6 +47,7 @@ const elements = {
   deviceDeleteButton: document.querySelector("#developerDeviceDeleteButton"),
   deviceProvisioningCard: document.querySelector("#developerProvisioningCard"),
   deviceProvisioningValue: document.querySelector("#developerProvisioningValue"),
+  selectedDeviceBanner: document.querySelector("#developerSelectedDeviceBanner"),
   deviceSummary: document.querySelector("#developerDeviceSummary"),
   deploymentHistory: document.querySelector("#developerDeploymentHistory"),
 
@@ -178,6 +180,7 @@ async function refreshOverview(successMessage = "") {
     renderBuildPlanDeviceOptions();
     renderUserList();
     renderDeviceList();
+    renderSelectedDeviceBanner();
     renderReleaseOptions();
     renderReleaseList();
     updateReleaseTargetFields();
@@ -245,13 +248,14 @@ function renderUserList() {
           <div class="developer-card-top">
             <div>
               <h3 class="developer-card-title">${escapeHtml(user.company_name || user.user_id)}</h3>
-              <p class="developer-card-copy">${escapeHtml(user.user_id)} - ${escapeHtml(user.email)}</p>
+              <p class="developer-card-copy">${escapeHtml(user.user_id)}</p>
             </div>
             <span class="developer-badge ${statusClass}">${user.status === "active" ? "Ativo" : "Pausado"}</span>
           </div>
           <div class="developer-card-bottom">
             <span class="developer-badge">${Number(user.device_count || 0)} ESP(s)</span>
             ${user.contact_name ? `<span class="developer-badge">${escapeHtml(user.contact_name)}</span>` : ""}
+            ${user.password_temporary ? '<span class="developer-badge developer-badge-warning">Troca pendente</span>' : ""}
           </div>
         </button>
       `;
@@ -295,7 +299,6 @@ function fillUserForm(user) {
   elements.userIdInput.readOnly = true;
   elements.userCompanyInput.value = user.company_name || "";
   elements.userContactInput.value = user.contact_name || "";
-  elements.userEmailInput.value = user.email || "";
   elements.userPasswordInput.value = "";
   elements.userRotatePasswordInput.checked = false;
   elements.userStatusInput.value = user.status || "active";
@@ -326,7 +329,6 @@ async function submitUserForm(event) {
     user_id: elements.userIdInput.value.trim(),
     company_name: elements.userCompanyInput.value.trim(),
     contact_name: elements.userContactInput.value.trim(),
-    email: elements.userEmailInput.value.trim(),
     password: elements.userPasswordInput.value.trim(),
     rotate_password: elements.userRotatePasswordInput.checked,
     status: elements.userStatusInput.value,
@@ -345,6 +347,7 @@ async function submitUserForm(event) {
       ? {
           userId: response.user.user_id,
           password: response.provisioning.password,
+          temporary: Boolean(response.provisioning.temporary),
         }
       : null;
 
@@ -400,7 +403,7 @@ function renderUserSummary(user) {
     <strong>${escapeHtml(user.company_name || user.user_id)}</strong>
     <div class="developer-summary-list">
       <div class="developer-summary-line"><span>ID</span><strong>${escapeHtml(user.user_id)}</strong></div>
-      <div class="developer-summary-line"><span>E-mail</span><strong>${escapeHtml(user.email || "--")}</strong></div>
+      <div class="developer-summary-line"><span>Acesso</span><strong>${user.password_temporary ? "Senha provisoria" : "Senha definitiva"}</strong></div>
       <div class="developer-summary-line"><span>Status</span><strong>${user.status === "active" ? "Ativo" : "Pausado"}</strong></div>
       <div class="developer-summary-line"><span>Contato</span><strong>${escapeHtml(user.contact_name || "--")}</strong></div>
     </div>
@@ -453,15 +456,23 @@ function renderDeviceList() {
         : "Sem deploy recente";
 
       return `
-        <button type="button" class="developer-device-card ${isActive ? "active" : ""}" data-device-id="${escapeHtml(device.device_id)}">
+        <button
+          type="button"
+          class="developer-device-card ${isActive ? "active" : ""}"
+          data-device-id="${escapeHtml(device.device_id)}"
+          aria-pressed="${isActive ? "true" : "false"}"
+        >
           <div class="developer-card-top">
             <div>
               <h3 class="developer-card-title">${escapeHtml(device.name || device.device_id)}</h3>
               <p class="developer-card-copy">${escapeHtml(device.device_id)} - ${escapeHtml(ownerLabel)}</p>
             </div>
-            <span class="developer-badge ${online ? "developer-badge-success" : ""}">
-              ${online ? "Online" : "Sem contato"}
-            </span>
+            <div class="developer-meta-grid">
+              ${isActive ? renderSelectionIndicator("ESP selecionado") : ""}
+              <span class="developer-badge ${online ? "developer-badge-success" : ""}">
+                ${online ? "Online" : "Sem contato"}
+              </span>
+            </div>
           </div>
           <div class="developer-card-bottom">
             <span class="developer-badge">${escapeHtml(device.location || "Sem local")}</span>
@@ -483,6 +494,29 @@ function renderDeviceList() {
   }
 }
 
+function renderSelectedDeviceBanner() {
+  if (!elements.selectedDeviceBanner) {
+    return;
+  }
+
+  const selectedDevice =
+    state.devices.find((device) => device.device_id === state.selectedDeviceId) || null;
+
+  if (!selectedDevice) {
+    elements.selectedDeviceBanner.innerHTML = `
+      <strong>Nenhum ESP selecionado</strong>
+      <p>Toque em um card para abrir o ESP e editar os dados dele.</p>
+    `;
+    return;
+  }
+
+  const online = inferDeviceOnline(selectedDevice);
+  elements.selectedDeviceBanner.innerHTML = `
+    <strong>${renderSelectionIndicator("ESP selecionado")} ${escapeHtml(selectedDevice.name || selectedDevice.device_id)}</strong>
+    <p>${escapeHtml(selectedDevice.device_id)} - ${escapeHtml(selectedDevice.location || "Sem local")} - ${online ? "online" : "sem contato"}</p>
+  `;
+}
+
 async function loadDeviceDetails(deviceId, options = {}) {
   if (!options.silent) {
     setBanner(`Carregando ${deviceId}...`, "");
@@ -495,10 +529,11 @@ async function loadDeviceDetails(deviceId, options = {}) {
     renderDeviceSummary(payload.device);
     renderDeploymentHistory(payload.device.deployments || []);
     renderDeviceList();
+    renderSelectedDeviceBanner();
     syncDeviceProvisioningCard();
 
     if (!options.silent) {
-      setBanner(`ESP ${payload.device.device_id} carregado.`, "success");
+      setBanner(`ESP selecionado: ${payload.device.device_id}.`, "success");
     }
   } catch (error) {
     handlePortalError(error, "Nao foi possivel abrir o ESP.");
@@ -544,6 +579,7 @@ function resetDeviceForm() {
   renderDeviceSummary(null);
   renderDeploymentHistory([]);
   renderDeviceList();
+  renderSelectedDeviceBanner();
 }
 
 async function submitDeviceForm(event) {
@@ -628,6 +664,7 @@ function renderDeviceSummary(device) {
 
   elements.deviceSummary.innerHTML = `
     <strong>${escapeHtml(device.name || device.device_id)}</strong>
+    <div class="developer-summary-selection">${renderSelectionIndicator("ESP selecionado")}</div>
     <div class="developer-summary-list">
       <div class="developer-summary-line"><span>ID</span><strong>${escapeHtml(device.device_id)}</strong></div>
       <div class="developer-summary-line"><span>Usuario</span><strong>${escapeHtml(device.owner_company_name || "Sem usuario")}</strong></div>
@@ -968,7 +1005,10 @@ function showUserProvisioningCard(password) {
 
 function hideUserProvisioningCard() {
   elements.userProvisioningCard.hidden = true;
+  elements.userProvisioningTitle.textContent = "Senha provisoria gerada";
   elements.userProvisioningValue.textContent = "";
+  elements.userProvisioningHint.textContent =
+    "Ela comeca com Haxis- e o usuario precisa trocar essa senha no primeiro login.";
 }
 
 function syncUserProvisioningCard() {
@@ -977,6 +1017,12 @@ function syncUserProvisioningCard() {
     state.selectedUserId &&
     state.userProvisioning.userId === state.selectedUserId
   ) {
+    elements.userProvisioningTitle.textContent = state.userProvisioning.temporary
+      ? "Senha provisoria gerada"
+      : "Senha definida";
+    elements.userProvisioningHint.textContent = state.userProvisioning.temporary
+      ? "Ela comeca com Haxis- e o usuario precisa trocar essa senha no primeiro login."
+      : "Essa senha foi definida agora e ja pode ser usada no painel do cliente.";
     showUserProvisioningCard(state.userProvisioning.password);
     return;
   }
@@ -1140,6 +1186,15 @@ function formatDateTime(value) {
 
 function numberOrDash(value) {
   return Number.isFinite(Number(value)) ? String(Number(value)) : "--";
+}
+
+function renderSelectionIndicator(label) {
+  return `
+    <span class="developer-selection-indicator">
+      <input class="developer-selection-checkbox" type="checkbox" checked disabled aria-hidden="true">
+      <span>${escapeHtml(label)}</span>
+    </span>
+  `;
 }
 
 function escapeHtml(value) {

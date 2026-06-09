@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import ssl
 import sys
 import tempfile
@@ -25,10 +24,24 @@ DEFAULT_SCHEMA_FILE = PROJECT_ROOT / "database" / "schema.sql"
 def main() -> int:
     args = parse_args()
     env_values = load_env_file(args.env_file)
+    if args.database:
+        env_values["MYSQL_DATABASE"] = args.database
+
     schema_sql = args.schema_file.read_text(encoding="utf-8")
     statements = split_sql_statements(schema_sql)
+    print_execution_plan(args, env_values, len(statements))
+
+    if args.dry_run:
+        if args.verbose:
+            for index, statement in enumerate(statements, start=1):
+                preview = compact_preview(statement)
+                print(f"[dry-run {index}/{len(statements)}] {preview}")
+
+        print("Dry-run concluido. Nenhuma alteracao foi aplicada no banco.")
+        return 0
 
     temp_ca_path = None
+    executed_statements = 0
     try:
         connection = create_connection(env_values)
         temp_ca_path = env_values.get("__temp_ca_path")
@@ -40,6 +53,7 @@ def main() -> int:
                         preview = compact_preview(statement)
                         print(f"[{index}/{len(statements)}] Executando: {preview}")
                     cursor.execute(statement)
+                    executed_statements = index
 
             connection.commit()
     except Exception as error:
@@ -52,7 +66,10 @@ def main() -> int:
     print(
         "Banco atualizado com sucesso.",
         f"Arquivo: {args.schema_file}",
+        f"Host: {env_values['MYSQL_HOST']}",
+        f"Porta: {env_values['MYSQL_PORT']}",
         f"Banco: {env_values['MYSQL_DATABASE']}",
+        f"Comandos executados: {executed_statements}",
         sep="\n",
     )
     return 0
@@ -79,6 +96,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Mostra cada comando executado.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Mostra o plano de execucao sem alterar o banco.",
+    )
+    parser.add_argument(
+        "--database",
+        type=str,
+        default="",
+        help="Sobrescreve o nome do banco definido no .env para esta execucao.",
+    )
     args = parser.parse_args()
 
     args.env_file = args.env_file.resolve()
@@ -91,6 +119,23 @@ def parse_args() -> argparse.Namespace:
         raise SystemExit(f"Arquivo schema.sql nao encontrado: {args.schema_file}")
 
     return args
+
+
+def print_execution_plan(
+    args: argparse.Namespace,
+    env_values: dict[str, str],
+    statement_count: int,
+) -> None:
+    print(
+        "Plano de execucao:",
+        f"Arquivo: {args.schema_file}",
+        f"Host: {env_values['MYSQL_HOST']}",
+        f"Porta: {env_values['MYSQL_PORT']}",
+        f"Banco: {env_values['MYSQL_DATABASE']}",
+        f"Comandos SQL encontrados: {statement_count}",
+        f"Modo: {'dry-run' if args.dry_run else 'aplicar alteracoes'}",
+        sep="\n",
+    )
 
 
 def load_env_file(env_path: Path) -> dict[str, str]:

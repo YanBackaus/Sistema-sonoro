@@ -5,18 +5,39 @@
 --   COLLATE utf8mb4_general_ci;
 -- USE esp32_monitor;
 
+SET @current_schema = DATABASE();
+
 CREATE TABLE IF NOT EXISTS client_users (
     user_id VARCHAR(64) NOT NULL,
     company_name VARCHAR(120) NOT NULL,
     contact_name VARCHAR(80) DEFAULT NULL,
-    email VARCHAR(160) NOT NULL,
+    email VARCHAR(160) DEFAULT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    password_temporary TINYINT(1) NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     UNIQUE KEY uq_client_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE client_users
+  MODIFY COLUMN email VARCHAR(160) DEFAULT NULL;
+
+SET @ddl = IF(
+  EXISTS(
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @current_schema
+      AND TABLE_NAME = 'client_users'
+      AND COLUMN_NAME = 'password_temporary'
+  ),
+  'SELECT 1',
+  'ALTER TABLE client_users ADD COLUMN password_temporary TINYINT(1) NOT NULL DEFAULT 0 AFTER password_hash'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS devices (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

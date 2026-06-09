@@ -221,6 +221,7 @@ async function listClientUsers(pool) {
       cu.company_name,
       cu.contact_name,
       cu.email,
+      cu.password_temporary,
       cu.status,
       cu.created_at,
       cu.updated_at,
@@ -232,6 +233,7 @@ async function listClientUsers(pool) {
       cu.company_name,
       cu.contact_name,
       cu.email,
+      cu.password_temporary,
       cu.status,
       cu.created_at,
       cu.updated_at
@@ -248,6 +250,7 @@ async function getClientUserById(pool, userId) {
       cu.company_name,
       cu.contact_name,
       cu.email,
+      cu.password_temporary,
       cu.status,
       cu.created_at,
       cu.updated_at,
@@ -260,6 +263,7 @@ async function getClientUserById(pool, userId) {
       cu.company_name,
       cu.contact_name,
       cu.email,
+      cu.password_temporary,
       cu.status,
       cu.created_at,
       cu.updated_at`,
@@ -326,9 +330,10 @@ async function getClientUserAuthRecordByIdentifier(pool, identifier) {
       contact_name,
       email,
       password_hash,
+      password_temporary,
       status
     FROM client_users
-    WHERE user_id = :identifier OR email = :identifier
+    WHERE user_id = :identifier
     LIMIT 1`,
     { identifier: normalized }
   );
@@ -337,16 +342,19 @@ async function getClientUserAuthRecordByIdentifier(pool, identifier) {
 }
 
 async function upsertClientUser(pool, user) {
-  const existing = await getClientUserById(pool, user.user_id);
+  const existing = await getClientUserAuthRecordByIdentifier(pool, user.user_id);
   let passwordHash = null;
   let provisionedPassword = null;
+  let passwordTemporary = existing ? Boolean(existing.password_temporary) : false;
 
   if (user.password) {
     provisionedPassword = user.password;
     passwordHash = hashPassword(user.password);
+    passwordTemporary = false;
   } else if (user.rotate_password || !existing) {
     provisionedPassword = generatePortalPassword();
     passwordHash = hashPassword(provisionedPassword);
+    passwordTemporary = true;
   }
 
   await pool.execute(
@@ -356,6 +364,7 @@ async function upsertClientUser(pool, user) {
       contact_name,
       email,
       password_hash,
+      password_temporary,
       status
     ) VALUES (
       :user_id,
@@ -363,6 +372,7 @@ async function upsertClientUser(pool, user) {
       :contact_name,
       :email,
       :password_hash,
+      :password_temporary,
       :status
     )
     ON DUPLICATE KEY UPDATE
@@ -370,6 +380,7 @@ async function upsertClientUser(pool, user) {
       contact_name = VALUES(contact_name),
       email = VALUES(email),
       password_hash = COALESCE(VALUES(password_hash), password_hash),
+      password_temporary = COALESCE(VALUES(password_temporary), password_temporary),
       status = VALUES(status)`,
     {
       user_id: user.user_id,
@@ -377,6 +388,7 @@ async function upsertClientUser(pool, user) {
       contact_name: user.contact_name,
       email: user.email,
       password_hash: passwordHash,
+      password_temporary: passwordHash === null ? null : (passwordTemporary ? 1 : 0),
       status: user.status,
     }
   );
@@ -386,9 +398,28 @@ async function upsertClientUser(pool, user) {
     provisioning: provisionedPassword
       ? {
           password: provisionedPassword,
+          temporary: passwordTemporary,
+          requires_password_change: passwordTemporary,
         }
       : null,
   };
+}
+
+async function updateClientUserPassword(pool, userId, password, passwordTemporary = false) {
+  await pool.execute(
+    `UPDATE client_users
+    SET
+      password_hash = :password_hash,
+      password_temporary = :password_temporary
+    WHERE user_id = :user_id`,
+    {
+      user_id: userId,
+      password_hash: hashPassword(password),
+      password_temporary: passwordTemporary ? 1 : 0,
+    }
+  );
+
+  return getClientUserDetails(pool, userId);
 }
 
 async function deleteClientUserById(pool, userId) {
@@ -1217,7 +1248,8 @@ function formatClientUserRow(row) {
     user_id: row.user_id,
     company_name: row.company_name,
     contact_name: row.contact_name || null,
-    email: row.email,
+    email: row.email || null,
+    password_temporary: Boolean(row.password_temporary),
     status: row.status,
     device_count: Number(row.device_count || 0),
     created_at: row.created_at,
@@ -1320,6 +1352,7 @@ module.exports = {
   deleteSchedule,
   upsertClientUser,
   upsertDevice,
+  updateClientUserPassword,
   updateDeviceHeartbeat,
   insertDeviceEvent,
 };

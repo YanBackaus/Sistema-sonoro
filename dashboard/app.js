@@ -6,6 +6,7 @@ const state = {
       ? window.location.origin
       : "http://localhost:3000",
   session: null,
+  requiresPasswordChange: false,
   devices: [],
   deviceSearchTerm: "",
   editingScheduleId: null,
@@ -21,16 +22,22 @@ const elements = {
   configHint: document.querySelector("#configHint"),
   loginPanel: document.querySelector("#loginPanel"),
   sessionPanel: document.querySelector("#sessionPanel"),
+  passwordChangePanel: document.querySelector("#passwordChangePanel"),
   identifierInput: document.querySelector("#identifierInput"),
   passwordInput: document.querySelector("#passwordInput"),
   loginButton: document.querySelector("#loginButton"),
+  passwordChangeForm: document.querySelector("#passwordChangeForm"),
+  currentPasswordInput: document.querySelector("#currentPasswordInput"),
+  newPasswordInput: document.querySelector("#newPasswordInput"),
+  confirmPasswordInput: document.querySelector("#confirmPasswordInput"),
+  changePasswordButton: document.querySelector("#changePasswordButton"),
   refreshButton: document.querySelector("#refreshButton"),
   logoutButton: document.querySelector("#logoutButton"),
   sessionCompanyName: document.querySelector("#sessionCompanyName"),
   sessionMeta: document.querySelector("#sessionMeta"),
   accountCompany: document.querySelector("#accountCompany"),
   accountUserId: document.querySelector("#accountUserId"),
-  accountEmail: document.querySelector("#accountEmail"),
+  accountAccess: document.querySelector("#accountAccess"),
   accountDeviceCount: document.querySelector("#accountDeviceCount"),
   deviceCardList: document.querySelector("#deviceCardList"),
   deviceSearchInput: document.querySelector("#deviceSearchInput"),
@@ -78,6 +85,7 @@ async function bootstrap() {
   window.addEventListener("offline", updateBrowserStatus);
 
   elements.loginButton.addEventListener("click", login);
+  elements.passwordChangeForm.addEventListener("submit", handlePasswordChange);
   elements.refreshButton.addEventListener("click", refreshEverything);
   elements.logoutButton.addEventListener("click", logout);
   elements.deviceSearchInput.addEventListener("input", handleDeviceSearch);
@@ -105,11 +113,13 @@ async function refreshSession(options = {}) {
 
     if (!payload?.ok || !payload.user) {
       state.session = null;
+      state.requiresPasswordChange = false;
       updateSessionUi();
       return false;
     }
 
     state.session = payload.user;
+    state.requiresPasswordChange = Boolean(payload.requires_password_change);
     updateSessionUi();
     return true;
   } catch (error) {
@@ -117,6 +127,7 @@ async function refreshSession(options = {}) {
       handleRequestFailure(error, "Nao foi possivel validar sua sessao.");
     }
     state.session = null;
+    state.requiresPasswordChange = false;
     updateSessionUi();
     return false;
   }
@@ -128,7 +139,7 @@ async function login() {
 
   if (!identifier || !password) {
     setApiBadge("API: login incompleto", false);
-    setHint("Informe usuario ou e-mail e tambem a senha.");
+    setHint("Informe seu usuario e tambem a senha.");
     return;
   }
 
@@ -137,14 +148,22 @@ async function login() {
     const payload = await apiRequest("/api/client/session", {
       method: "POST",
       body: JSON.stringify({
-        identifier,
+        user_id: identifier,
         password,
       }),
     });
 
     state.session = payload.user || null;
+    state.requiresPasswordChange = Boolean(payload.requires_password_change);
     elements.passwordInput.value = "";
     updateSessionUi();
+
+    if (state.requiresPasswordChange) {
+      renderPasswordChangeRequiredState();
+      showFlash("Senha provisoria aceita. Troque a senha para liberar a agenda.", "success");
+      return;
+    }
+
     await refreshEverything();
     showFlash("Sessao iniciada com sucesso.", "success");
   } catch (error) {
@@ -163,12 +182,52 @@ async function logout() {
   }
 
   state.session = null;
+  state.requiresPasswordChange = false;
   state.devices = [];
   state.selectedDeviceId = "";
   state.schedules = [];
   elements.identifierInput.value = "";
   elements.passwordInput.value = "";
+  clearPasswordChangeForm();
   renderLoggedOutState();
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+
+  const currentPassword = elements.currentPasswordInput.value.trim();
+  const newPassword = elements.newPasswordInput.value.trim();
+  const confirmPassword = elements.confirmPasswordInput.value.trim();
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    showFlash("Preencha a senha atual, a nova senha e a confirmacao.", "error");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showFlash("A confirmacao da nova senha nao confere.", "error");
+    return;
+  }
+
+  try {
+    setLoadingState("Trocando senha...");
+    const payload = await apiRequest("/api/client/session/password", {
+      method: "PUT",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+
+    state.session = payload.user || state.session;
+    state.requiresPasswordChange = Boolean(payload.requires_password_change);
+    clearPasswordChangeForm();
+    updateSessionUi();
+    await refreshEverything();
+    showFlash("Senha atualizada. A agenda dos ESPs foi liberada.", "success");
+  } catch (error) {
+    handleRequestFailure(error, "Nao foi possivel trocar a senha.");
+  }
 }
 
 async function refreshEverything() {
@@ -178,6 +237,11 @@ async function refreshEverything() {
       renderLoggedOutState();
       return;
     }
+  }
+
+  if (state.requiresPasswordChange) {
+    renderPasswordChangeRequiredState();
+    return;
   }
 
   try {
@@ -212,7 +276,29 @@ async function refreshEverything() {
   }
 }
 
+function renderPasswordChangeRequiredState() {
+  state.devices = [];
+  state.selectedDeviceId = "";
+  state.schedules = [];
+  renderDeviceSummary(null);
+  renderSchedules([]);
+  resetScheduleForm();
+  elements.selectedDeviceHeading.textContent = "Troque a senha provisoria";
+  elements.selectedDeviceContext.textContent = "Assim que a nova senha for salva, os ESPs da sua conta serao liberados aqui.";
+  elements.workspaceScopeBadge.textContent = "Bloqueado";
+  elements.deviceStatusText.textContent = "Troca de senha pendente";
+  elements.deviceCardList.innerHTML =
+    '<div class="empty-state">Troque a senha provisoria para liberar os ESPs da sua conta.</div>';
+  elements.deviceSelect.innerHTML = '<option value="">Troque a senha primeiro</option>';
+  elements.scheduleCountNote.textContent = "Agenda bloqueada ate a troca da senha.";
+  elements.scheduleList.innerHTML =
+    '<div class="empty-state">Depois de trocar a senha provisoria, os horarios de cada ESP aparecem aqui.</div>';
+  setApiBadge("API: senha provisoria", true);
+  setHint("Defina uma nova senha para continuar.");
+}
+
 function renderLoggedOutState() {
+  clearPasswordChangeForm();
   updateSessionUi();
   renderDeviceSummary(null);
   renderSchedules([]);
@@ -226,28 +312,41 @@ function renderLoggedOutState() {
   hideFlash();
 }
 
+function clearPasswordChangeForm() {
+  elements.currentPasswordInput.value = "";
+  elements.newPasswordInput.value = "";
+  elements.confirmPasswordInput.value = "";
+}
+
 function updateSessionUi() {
   const isLoggedIn = Boolean(state.session);
   elements.loginPanel.hidden = isLoggedIn;
   elements.sessionPanel.hidden = !isLoggedIn;
-  elements.sessionBadge.textContent = isLoggedIn ? "Sessao: ativa" : "Sessao: fechada";
-  elements.sessionBadge.classList.toggle("badge-offline", !isLoggedIn);
+  elements.passwordChangePanel.hidden = !isLoggedIn || !state.requiresPasswordChange;
+  elements.sessionBadge.textContent = isLoggedIn
+    ? state.requiresPasswordChange
+      ? "Sessao: troca pendente"
+      : "Sessao: ativa"
+    : "Sessao: fechada";
+  elements.sessionBadge.classList.toggle("badge-offline", !isLoggedIn || state.requiresPasswordChange);
 
   if (!isLoggedIn) {
     elements.sessionCompanyName.textContent = "Conta desconectada";
     elements.sessionMeta.textContent = "Entre para editar os horarios dos seus ESPs.";
     elements.accountCompany.textContent = "--";
     elements.accountUserId.textContent = "--";
-    elements.accountEmail.textContent = "--";
+    elements.accountAccess.textContent = "--";
     elements.accountDeviceCount.textContent = "--";
     return;
   }
 
   elements.sessionCompanyName.textContent = state.session.company_name || state.session.user_id || "Conta conectada";
-  elements.sessionMeta.textContent = `${state.session.user_id} - ${state.session.email}`;
+  elements.sessionMeta.textContent = state.requiresPasswordChange
+    ? "Sua conta entrou com senha provisoria. Troque a senha para liberar os ESPs."
+    : `${state.session.user_id} pronto para gerenciar os horarios dos ESPs.`;
   elements.accountCompany.textContent = state.session.company_name || "--";
   elements.accountUserId.textContent = state.session.user_id || "--";
-  elements.accountEmail.textContent = state.session.email || "--";
+  elements.accountAccess.textContent = state.requiresPasswordChange ? "Senha provisoria" : "Senha definitiva";
   elements.accountDeviceCount.textContent = String(Array.isArray(state.session.devices) ? state.session.devices.length : state.devices.length);
 }
 
@@ -257,6 +356,11 @@ function handleDeviceSearch(event) {
 }
 
 async function handleDeviceSelection(event) {
+  if (state.requiresPasswordChange) {
+    renderPasswordChangeRequiredState();
+    return;
+  }
+
   resetScheduleForm();
   state.selectedDeviceId = event.target.value;
   renderDeviceCards();
@@ -264,6 +368,11 @@ async function handleDeviceSelection(event) {
 }
 
 async function handleDeviceCardClick(event) {
+  if (state.requiresPasswordChange) {
+    renderPasswordChangeRequiredState();
+    return;
+  }
+
   const button = event.target.closest("[data-device-id]");
   if (!button) {
     return;
@@ -282,6 +391,11 @@ async function handleDeviceCardClick(event) {
 }
 
 async function loadSelectedDevice() {
+  if (state.requiresPasswordChange) {
+    renderPasswordChangeRequiredState();
+    return;
+  }
+
   if (!state.selectedDeviceId) {
     renderDeviceSummary(null);
     renderSchedules([]);
@@ -319,6 +433,11 @@ async function loadSelectedDevice() {
 
 async function handleScheduleSave(event) {
   event.preventDefault();
+
+  if (state.requiresPasswordChange) {
+    showFlash("Troque a senha provisoria antes de editar horarios.", "error");
+    return;
+  }
 
   if (!state.selectedDeviceId) {
     showFlash("Selecione um ESP antes de cadastrar horarios.", "error");
@@ -379,6 +498,11 @@ async function handleScheduleSave(event) {
 }
 
 async function handleScheduleListClick(event) {
+  if (state.requiresPasswordChange) {
+    showFlash("Troque a senha provisoria antes de editar horarios.", "error");
+    return;
+  }
+
   const button = event.target.closest("[data-action]");
   if (!button) {
     return;
@@ -783,8 +907,17 @@ function handleRequestFailure(error, fallbackMessage) {
 
   if (error?.status === 401) {
     state.session = null;
+    state.requiresPasswordChange = false;
     renderLoggedOutState();
     showFlash("Sua sessao expirou. Entre novamente.", "error");
+    return;
+  }
+
+  if (error?.status === 403 && error?.payload?.requires_password_change) {
+    state.requiresPasswordChange = true;
+    updateSessionUi();
+    renderPasswordChangeRequiredState();
+    showFlash(error.message || "Troque a senha provisoria para continuar.", "error");
     return;
   }
 

@@ -27,8 +27,8 @@
 
         <div class="session-stack" id="loginPanel">
           <label class="field">
-            <span>Usuario ou e-mail</span>
-            <input id="identifierInput" type="text" placeholder="empresa_alpha ou contato@empresa.com" autocomplete="username">
+            <span>Usuario</span>
+            <input id="identifierInput" type="text" placeholder="empresa_alpha" autocomplete="username">
           </label>
 
           <label class="field">
@@ -50,6 +50,32 @@
           <div class="inline-actions">
             <button id="refreshButton" type="button">Atualizar</button>
             <button id="logoutButton" type="button" class="button-secondary">Sair</button>
+          </div>
+
+          <div class="session-summary" id="passwordChangePanel" hidden>
+            <strong>Troca de senha obrigatoria</strong>
+            <p>Esta conta entrou com uma senha provisoria. Defina uma nova senha para liberar a agenda dos ESPs.</p>
+
+            <form id="passwordChangeForm" class="stack-form">
+              <label class="field">
+                <span>Senha atual</span>
+                <input id="currentPasswordInput" type="password" placeholder="Digite a senha provisoria" autocomplete="current-password">
+              </label>
+
+              <label class="field">
+                <span>Nova senha</span>
+                <input id="newPasswordInput" type="password" placeholder="Minimo de 8 caracteres" autocomplete="new-password">
+              </label>
+
+              <label class="field">
+                <span>Confirmar nova senha</span>
+                <input id="confirmPasswordInput" type="password" placeholder="Repita a nova senha" autocomplete="new-password">
+              </label>
+
+              <div class="inline-actions">
+                <button id="changePasswordButton" type="submit">Trocar senha</button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -141,8 +167,8 @@
                 <dd id="accountUserId">--</dd>
               </div>
               <div>
-                <dt>E-mail</dt>
-                <dd id="accountEmail">--</dd>
+                <dt>Acesso</dt>
+                <dd id="accountAccess">--</dd>
               </div>
               <div>
                 <dt>ESPs liberados</dt>

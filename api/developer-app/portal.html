@@ -15,7 +15,7 @@
       <div>
         <p class="eyebrow">Desenvolvedor</p>
         <h1>Painel de usuarios, ESPs e OTA</h1>
-        <p class="developer-copy">Centralize cadastro, dono de cada ESP e releases OTA com mais controle sobre cada firmware.</p>
+        <p class="developer-copy">Centralize usuarios, donos de ESPs e releases OTA com mais controle sobre cada firmware.</p>
       </div>
       <div class="developer-toolbar">
         <span class="developer-chip" id="developerSessionChip">Sessao ativa</span>
@@ -107,18 +107,13 @@
                 </div>
 
                 <label class="field">
-                  <span>E-mail</span>
-                  <input id="developerUserEmailInput" type="email" placeholder="contato@empresa.com" autocomplete="off" required>
-                </label>
-
-                <label class="field">
                   <span>Senha (opcional)</span>
-                  <input id="developerUserPasswordInput" type="text" placeholder="Deixe vazio para gerar automaticamente" autocomplete="new-password">
+                  <input id="developerUserPasswordInput" type="text" placeholder="Deixe vazio para gerar Haxis-XXXXXX" autocomplete="new-password">
                 </label>
 
                 <label class="toggle">
                   <input id="developerUserRotatePasswordInput" type="checkbox">
-                  <span>Gerar nova senha ao salvar</span>
+                  <span>Gerar nova senha provisoria ao salvar</span>
                 </label>
 
                 <div class="developer-inline-actions">
@@ -128,8 +123,9 @@
                 </div>
 
                 <div class="developer-note-card" id="developerUserProvisioningCard" hidden>
-                  <strong>Senha gerada</strong>
+                  <strong id="developerUserProvisioningTitle">Senha provisoria gerada</strong>
                   <code id="developerUserProvisioningValue"></code>
+                  <p class="hint" id="developerUserProvisioningHint">Ela comeca com Haxis- e o usuario precisa trocar essa senha no primeiro login.</p>
                 </div>
               </form>
             </section>
@@ -159,6 +155,11 @@
                 <p class="section-kicker">ESPs</p>
                 <h2>Dispositivos cadastrados</h2>
               </div>
+            </div>
+
+            <div class="developer-note-card developer-selected-device-banner" id="developerSelectedDeviceBanner">
+              <strong>Nenhum ESP selecionado</strong>
+              <p>Toque em um card para abrir o ESP e editar os dados dele.</p>
             </div>
 
             <div class="developer-list" id="developerDeviceList">
@@ -277,7 +278,7 @@
         </div>
       </section>
 
-      <section class="developer-tab-panel" data-tab-panel="updates" hidden>
+      <section class="developer-tab-panel developer-tab-panel-updates" data-tab-panel="updates" hidden>
         <div class="developer-grid">
           <div class="developer-stack">
             <section class="developer-panel">
