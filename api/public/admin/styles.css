@@ -671,18 +671,23 @@ button:active {
   display: grid;
   place-items: center;
   padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: rgba(31, 47, 48, 0.34);
   backdrop-filter: blur(6px);
 }
 
 .modal-card {
-  width: min(560px, 100%);
+  width: min(560px, calc(100vw - 40px));
+  max-width: 100%;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   padding: 24px;
   box-shadow: 0 28px 80px rgba(24, 49, 44, 0.24);
 }
 
 .modal-card-wide {
-  width: min(860px, 100%);
+  width: min(860px, calc(100vw - 40px));
 }
 
 .modal-head {
@@ -711,6 +716,35 @@ button:active {
 
 .modal-actions {
   margin-top: 8px;
+}
+
+.modal-actions button {
+  flex: 1 1 220px;
+}
+
+#scheduleEditorPanel .stack-form {
+  gap: 18px;
+}
+
+#scheduleEditorPanel .field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#scheduleEditorPanel .field-grid-wide {
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(120px, 0.8fr));
+}
+
+#scheduleEditorPanel .day-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+#scheduleEditorPanel .day-chip span {
+  min-height: 46px;
+  padding: 0 10px;
+}
+
+#scheduleEditorPanel .toggle {
+  flex-wrap: wrap;
 }
 
 .editor-badge {
@@ -863,6 +897,22 @@ button:active {
   .compact-select {
     display: grid;
   }
+
+  #scheduleEditorPanel .field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #scheduleEditorPanel .field-grid-wide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #scheduleEditorPanel .field-grid-wide > .field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  #scheduleEditorPanel .day-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -878,6 +928,19 @@ button:active {
   .modal-card,
   .workspace-tabs {
     padding: 18px;
+  }
+
+  .modal-backdrop {
+    place-items: start center;
+    padding: 12px;
+  }
+
+  .modal-card,
+  .modal-card-wide {
+    width: min(100%, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    border-radius: 20px;
   }
 
   h1 {
@@ -923,10 +986,43 @@ button:active {
   .tab-button {
     flex: 1 1 100%;
   }
+
+  #scheduleEditorPanel .field-grid,
+  #scheduleEditorPanel .field-grid-wide {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  #scheduleEditorPanel .field-grid-wide > .field:first-child {
+    grid-column: auto;
+  }
+
+  #scheduleEditorPanel .day-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #scheduleEditorPanel .modal-head-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #scheduleEditorPanel .modal-actions {
+    width: 100%;
+  }
+
+  #scheduleEditorPanel .modal-actions button {
+    width: 100%;
+    flex: 1 1 100%;
+  }
 }
 
 @media (max-width: 540px) {
   .stat-strip {
     grid-template-columns: 1fr;
+  }
+
+  #scheduleEditorPanel .day-chip span {
+    min-height: 42px;
+    font-size: 0.92rem;
   }
 }
