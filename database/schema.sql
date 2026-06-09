@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS devices (
     firmware_profile VARCHAR(80) DEFAULT NULL,
     device_api_key_hash CHAR(64) DEFAULT NULL,
     device_api_key_last4 CHAR(4) DEFAULT NULL,
+    pending_device_api_key_hash CHAR(64) DEFAULT NULL,
+    pending_device_api_key_last4 CHAR(4) DEFAULT NULL,
+    pending_device_api_key_created_at DATETIME DEFAULT NULL,
     sound_enabled TINYINT(1) NOT NULL DEFAULT 1,
     local_sound_enabled TINYINT(1) DEFAULT NULL,
     utc_offset_minutes SMALLINT NOT NULL DEFAULT -180,
@@ -82,6 +85,51 @@ SET @ddl = IF(
   ),
   'SELECT 1',
   'ALTER TABLE devices ADD COLUMN device_api_key_hash CHAR(64) DEFAULT NULL AFTER menu_title'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  EXISTS(
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @current_schema
+      AND TABLE_NAME = 'devices'
+      AND COLUMN_NAME = 'pending_device_api_key_hash'
+  ),
+  'SELECT 1',
+  'ALTER TABLE devices ADD COLUMN pending_device_api_key_hash CHAR(64) DEFAULT NULL AFTER device_api_key_last4'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  EXISTS(
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @current_schema
+      AND TABLE_NAME = 'devices'
+      AND COLUMN_NAME = 'pending_device_api_key_last4'
+  ),
+  'SELECT 1',
+  'ALTER TABLE devices ADD COLUMN pending_device_api_key_last4 CHAR(4) DEFAULT NULL AFTER pending_device_api_key_hash'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  EXISTS(
+    SELECT 1
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @current_schema
+      AND TABLE_NAME = 'devices'
+      AND COLUMN_NAME = 'pending_device_api_key_created_at'
+  ),
+  'SELECT 1',
+  'ALTER TABLE devices ADD COLUMN pending_device_api_key_created_at DATETIME DEFAULT NULL AFTER pending_device_api_key_last4'
 );
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;

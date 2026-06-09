@@ -31,7 +31,9 @@ const {
   markFirmwareDeploymentAppliedByVersion,
   markFirmwareDeploymentApplying,
   markFirmwareDeploymentFailed,
+  promotePendingDeviceApiKey,
   queueFirmwareDeployment,
+  stageDeviceRecoveryKey,
   updateDeviceHeartbeat,
   insertDeviceEvent,
 } = require("./db");
@@ -112,6 +114,7 @@ app.get("/", (request, response) => {
       clientSession: "POST /api/client/session",
       clientPassword: "PUT /api/client/session/password",
       developer: "GET /developer/login",
+      developerRecoveryKey: "POST /api/developer/devices/:deviceId/recovery-key",
       developerBuildPlan: "POST /api/developer/build-plan",
     },
   });
@@ -609,6 +612,29 @@ app.post("/api/developer/devices", requireDeveloperSession, async (request, resp
       ok: true,
       device: saved.device,
       provisioning: saved.provisioning,
+    });
+  } catch (error) {
+    handleApiError(error, response);
+  }
+});
+
+app.post("/api/developer/devices/:deviceId/recovery-key", requireDeveloperSession, async (request, response) => {
+  try {
+    const deviceId = normalizeDeviceId(request.params.deviceId, "deviceId");
+    const staged = await stageDeviceRecoveryKey(pool, deviceId, config);
+
+    if (!staged) {
+      response.status(404).json({
+        ok: false,
+        error: "ESP nao encontrado.",
+      });
+      return;
+    }
+
+    response.json({
+      ok: true,
+      device: staged.device,
+      provisioning: staged.provisioning,
     });
   } catch (error) {
     handleApiError(error, response);
@@ -1255,17 +1281,26 @@ async function requireDeviceAccess(request, response, next) {
     }
 
     const authRecord = await getDeviceAuthRecord(pool, deviceId);
-    const isAuthorized =
+    const matchedPrimary =
       authRecord &&
       authRecord.device_api_key_hash &&
       verifyDeviceApiKey(deviceKey, authRecord.device_api_key_hash, config.deviceKeyPepper);
+    const matchedPending =
+      !matchedPrimary &&
+      authRecord &&
+      authRecord.pending_device_api_key_hash &&
+      verifyDeviceApiKey(deviceKey, authRecord.pending_device_api_key_hash, config.deviceKeyPepper);
 
-    if (!isAuthorized) {
+    if (!matchedPrimary && !matchedPending) {
       response.status(401).json({
         ok: false,
         error: "Invalid device credentials.",
       });
       return;
+    }
+
+    if (matchedPending) {
+      await promotePendingDeviceApiKey(pool, deviceId);
     }
 
     request.authorizedDeviceId = deviceId;

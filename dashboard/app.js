@@ -7,6 +7,8 @@ const state = {
       : "http://localhost:3000",
   session: null,
   requiresPasswordChange: false,
+  activeWorkspaceTab: "agenda",
+  isScheduleModalOpen: false,
   devices: [],
   deviceSearchTerm: "",
   editingScheduleId: null,
@@ -31,10 +33,13 @@ const elements = {
   newPasswordInput: document.querySelector("#newPasswordInput"),
   confirmPasswordInput: document.querySelector("#confirmPasswordInput"),
   changePasswordButton: document.querySelector("#changePasswordButton"),
+  passwordChangeLogoutButton: document.querySelector("#passwordChangeLogoutButton"),
   refreshButton: document.querySelector("#refreshButton"),
   logoutButton: document.querySelector("#logoutButton"),
   sessionCompanyName: document.querySelector("#sessionCompanyName"),
   sessionMeta: document.querySelector("#sessionMeta"),
+  workspaceTabButtons: document.querySelectorAll("[data-workspace-tab]"),
+  workspacePanels: document.querySelectorAll("[data-workspace-panel]"),
   accountCompany: document.querySelector("#accountCompany"),
   accountUserId: document.querySelector("#accountUserId"),
   accountAccess: document.querySelector("#accountAccess"),
@@ -45,10 +50,14 @@ const elements = {
   deviceStatusText: document.querySelector("#deviceStatusText"),
   flashMessage: document.querySelector("#flashMessage"),
   scheduleCountNote: document.querySelector("#scheduleCountNote"),
+  openScheduleModalButton: document.querySelector("#openScheduleModalButton"),
+  scheduleEditorPanel: document.querySelector("#scheduleEditorPanel"),
+  closeScheduleModalButton: document.querySelector("#closeScheduleModalButton"),
   scheduleEditorBadge: document.querySelector("#scheduleEditorBadge"),
   scheduleForm: document.querySelector("#scheduleForm"),
   scheduleFormKicker: document.querySelector("#scheduleFormKicker"),
   scheduleFormTitle: document.querySelector("#scheduleFormTitle"),
+  scheduleFormContext: document.querySelector("#scheduleFormContext"),
   scheduleLabelInput: document.querySelector("#scheduleLabelInput"),
   scheduleHourInput: document.querySelector("#scheduleHourInput"),
   scheduleMinuteInput: document.querySelector("#scheduleMinuteInput"),
@@ -62,7 +71,6 @@ const elements = {
   scheduleList: document.querySelector("#scheduleList"),
   selectedDeviceHeading: document.querySelector("#selectedDeviceHeading"),
   selectedDeviceContext: document.querySelector("#selectedDeviceContext"),
-  workspaceScopeBadge: document.querySelector("#workspaceScopeBadge"),
   summaryConnectionStatus: document.querySelector("#summaryConnectionStatus"),
   summaryTotalSchedules: document.querySelector("#summaryTotalSchedules"),
   summaryActiveSchedules: document.querySelector("#summaryActiveSchedules"),
@@ -86,14 +94,23 @@ async function bootstrap() {
 
   elements.loginButton.addEventListener("click", login);
   elements.passwordChangeForm.addEventListener("submit", handlePasswordChange);
+  elements.passwordChangeLogoutButton.addEventListener("click", logout);
   elements.refreshButton.addEventListener("click", refreshEverything);
   elements.logoutButton.addEventListener("click", logout);
+  elements.workspaceTabButtons.forEach((button) => {
+    button.addEventListener("click", handleWorkspaceTabClick);
+  });
   elements.deviceSearchInput.addEventListener("input", handleDeviceSearch);
   elements.deviceSelect.addEventListener("change", handleDeviceSelection);
   elements.deviceCardList.addEventListener("click", handleDeviceCardClick);
+  elements.openScheduleModalButton.addEventListener("click", handleOpenScheduleModal);
+  elements.scheduleEditorPanel.addEventListener("click", handleScheduleModalBackdropClick);
+  elements.closeScheduleModalButton.addEventListener("click", handleScheduleModalDismiss);
   elements.scheduleForm.addEventListener("submit", handleScheduleSave);
-  elements.resetScheduleButton.addEventListener("click", resetScheduleForm);
+  elements.resetScheduleButton.addEventListener("click", handleScheduleModalDismiss);
   elements.scheduleList.addEventListener("click", handleScheduleListClick);
+  window.addEventListener("keydown", handleGlobalKeydown);
+  switchWorkspaceTab(state.activeWorkspaceTab);
   syncScheduleEditorUi();
 
   const hasSession = await refreshSession({ silent: true });
@@ -189,6 +206,7 @@ async function logout() {
   elements.identifierInput.value = "";
   elements.passwordInput.value = "";
   clearPasswordChangeForm();
+  closeScheduleModal();
   renderLoggedOutState();
 }
 
@@ -254,6 +272,7 @@ async function refreshEverything() {
 
     if (!state.devices.length) {
       state.selectedDeviceId = "";
+      closeScheduleModal();
       renderDeviceSummary(null);
       renderSchedules([]);
       resetScheduleForm();
@@ -280,12 +299,13 @@ function renderPasswordChangeRequiredState() {
   state.devices = [];
   state.selectedDeviceId = "";
   state.schedules = [];
+  closeScheduleModal();
+  switchWorkspaceTab("agenda");
   renderDeviceSummary(null);
   renderSchedules([]);
   resetScheduleForm();
   elements.selectedDeviceHeading.textContent = "Troque a senha provisoria";
   elements.selectedDeviceContext.textContent = "Assim que a nova senha for salva, os ESPs da sua conta serao liberados aqui.";
-  elements.workspaceScopeBadge.textContent = "Bloqueado";
   elements.deviceStatusText.textContent = "Troca de senha pendente";
   elements.deviceCardList.innerHTML =
     '<div class="empty-state">Troque a senha provisoria para liberar os ESPs da sua conta.</div>';
@@ -299,6 +319,8 @@ function renderPasswordChangeRequiredState() {
 
 function renderLoggedOutState() {
   clearPasswordChangeForm();
+  closeScheduleModal();
+  switchWorkspaceTab("agenda");
   updateSessionUi();
   renderDeviceSummary(null);
   renderSchedules([]);
@@ -323,6 +345,10 @@ function updateSessionUi() {
   elements.loginPanel.hidden = isLoggedIn;
   elements.sessionPanel.hidden = !isLoggedIn;
   elements.passwordChangePanel.hidden = !isLoggedIn || !state.requiresPasswordChange;
+  document.body.classList.toggle(
+    "modal-open",
+    (isLoggedIn && state.requiresPasswordChange) || state.isScheduleModalOpen
+  );
   elements.sessionBadge.textContent = isLoggedIn
     ? state.requiresPasswordChange
       ? "Sessao: troca pendente"
@@ -348,6 +374,21 @@ function updateSessionUi() {
   elements.accountUserId.textContent = state.session.user_id || "--";
   elements.accountAccess.textContent = state.requiresPasswordChange ? "Senha provisoria" : "Senha definitiva";
   elements.accountDeviceCount.textContent = String(Array.isArray(state.session.devices) ? state.session.devices.length : state.devices.length);
+
+  if (state.requiresPasswordChange) {
+    queueMicrotask(() => {
+      elements.currentPasswordInput.focus();
+    });
+  }
+}
+
+function handleWorkspaceTabClick(event) {
+  const nextTab = event.currentTarget.getAttribute("data-workspace-tab");
+  if (!nextTab) {
+    return;
+  }
+
+  switchWorkspaceTab(nextTab);
 }
 
 function handleDeviceSearch(event) {
@@ -397,6 +438,7 @@ async function loadSelectedDevice() {
   }
 
   if (!state.selectedDeviceId) {
+    closeScheduleModal();
     renderDeviceSummary(null);
     renderSchedules([]);
     elements.deviceStatusText.textContent = "Nenhum ESP selecionado";
@@ -486,6 +528,7 @@ async function handleScheduleSave(event) {
         ? `Horario ${payload.label} cadastrado com sucesso.`
         : `Horario ${payload.label} atualizado com sucesso.`;
     resetScheduleForm();
+    closeScheduleModal();
     showFlash(successMessage, "success");
   } catch (error) {
     handleRequestFailure(
@@ -672,8 +715,7 @@ function renderDeviceCards() {
 function renderDeviceSummary(device) {
   if (!device) {
     elements.selectedDeviceHeading.textContent = "Selecione um ESP";
-    elements.selectedDeviceContext.textContent = "Escolha um ESP da lista para ver e editar os horarios dele.";
-    elements.workspaceScopeBadge.textContent = "Sem ESP";
+    elements.selectedDeviceContext.textContent = "Escolha um ESP da lista para ver somente os horarios dele.";
     elements.summaryConnectionStatus.textContent = "--";
     elements.summaryTotalSchedules.textContent = "--";
     elements.summaryActiveSchedules.textContent = "--";
@@ -696,8 +738,7 @@ function renderDeviceSummary(device) {
   const connectionStatus = inferDeviceOnline(device) ? "Online" : "Offline";
 
   elements.selectedDeviceHeading.textContent = device.menu_title || device.name || device.device_id;
-  elements.selectedDeviceContext.textContent = `${device.device_id} selecionado. Os horarios abaixo sao so dele.`;
-  elements.workspaceScopeBadge.textContent = device.device_id;
+  elements.selectedDeviceContext.textContent = `${device.device_id} selecionado. Os horarios abaixo pertencem somente a ele.`;
   elements.summaryConnectionStatus.textContent = connectionStatus;
   elements.summaryTotalSchedules.textContent = String(totalSchedules);
   elements.summaryActiveSchedules.textContent = String(activeScheduleCount);
@@ -844,8 +885,7 @@ function startEditingSchedule(schedule) {
 
   syncScheduleEditorUi(schedule);
   renderSchedules(state.schedules);
-  showFlash(`Editando ${schedule.label}.`, "success");
-  elements.scheduleForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  openScheduleModal();
 }
 
 function syncScheduleEditorUi(schedule = null) {
@@ -854,15 +894,82 @@ function syncScheduleEditorUi(schedule = null) {
   const deviceLabel = state.selectedDeviceId || "ESP selecionado";
 
   elements.scheduleFormKicker.textContent = isEditing ? "Editar horario" : "Novo horario";
-  elements.scheduleFormTitle.textContent = isEditing
-    ? `Horario do ${deviceLabel}`
-    : `Novo horario para ${deviceLabel}`;
+  elements.scheduleFormTitle.textContent = isEditing ? "Editar horario" : "Cadastrar horario";
+  elements.scheduleFormContext.textContent = isEditing
+    ? `Atualize o horario selecionado para o ESP ${deviceLabel}.`
+    : `Preencha os dados do novo toque para o ESP ${deviceLabel}.`;
   elements.saveScheduleButton.textContent = isEditing ? "Salvar alteracoes" : "Cadastrar horario";
-  elements.resetScheduleButton.textContent = isEditing ? "Cancelar edicao" : "Limpar";
-  elements.scheduleEditorBadge.hidden = false;
+  elements.resetScheduleButton.textContent = isEditing ? "Cancelar edicao" : "Fechar";
   elements.scheduleEditorBadge.textContent = isEditing
     ? `Editando #${currentSchedule?.id ?? state.editingScheduleId}`
     : "Criando";
+}
+
+function switchWorkspaceTab(nextTab) {
+  state.activeWorkspaceTab = nextTab === "informacoes" ? "informacoes" : "agenda";
+
+  elements.workspaceTabButtons.forEach((button) => {
+    const isActive = button.getAttribute("data-workspace-tab") === state.activeWorkspaceTab;
+    button.classList.toggle("tab-button-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  elements.workspacePanels.forEach((panel) => {
+    const isActive = panel.getAttribute("data-workspace-panel") === state.activeWorkspaceTab;
+    panel.hidden = !isActive;
+  });
+}
+
+function handleOpenScheduleModal() {
+  if (state.requiresPasswordChange) {
+    showFlash("Troque a senha provisoria antes de editar horarios.", "error");
+    return;
+  }
+
+  if (!state.selectedDeviceId) {
+    showFlash("Selecione um ESP antes de cadastrar horarios.", "error");
+    return;
+  }
+
+  resetScheduleForm();
+  openScheduleModal();
+}
+
+function openScheduleModal() {
+  state.isScheduleModalOpen = true;
+  elements.scheduleEditorPanel.hidden = false;
+  updateSessionUi();
+
+  queueMicrotask(() => {
+    elements.scheduleLabelInput.focus();
+  });
+}
+
+function closeScheduleModal() {
+  state.isScheduleModalOpen = false;
+  elements.scheduleEditorPanel.hidden = true;
+  updateSessionUi();
+}
+
+function handleScheduleModalDismiss() {
+  resetScheduleForm();
+  closeScheduleModal();
+}
+
+function handleScheduleModalBackdropClick(event) {
+  if (event.target !== elements.scheduleEditorPanel) {
+    return;
+  }
+
+  handleScheduleModalDismiss();
+}
+
+function handleGlobalKeydown(event) {
+  if (event.key !== "Escape" || !state.isScheduleModalOpen) {
+    return;
+  }
+
+  handleScheduleModalDismiss();
 }
 
 function findScheduleById(scheduleId) {

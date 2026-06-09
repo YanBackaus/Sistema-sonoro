@@ -229,7 +229,7 @@
                     <input id="developerDeviceUtcOffsetInput" type="number" value="-180">
                   </label>
                   <label class="field">
-                    <span>Nova chave (opcional)</span>
+                    <span>Definir chave agora (opcional)</span>
                     <input id="developerDeviceKeyInput" type="text" placeholder="Deixe vazio para manter" autocomplete="off">
                   </label>
                 </div>
@@ -241,18 +241,20 @@
 
                 <label class="toggle">
                   <input id="developerRotateKeyInput" type="checkbox">
-                  <span>Gerar nova chave ao salvar</span>
+                  <span>Trocar chave agora ao salvar</span>
                 </label>
 
                 <div class="developer-inline-actions">
                   <button type="submit">Salvar ESP</button>
+                  <button type="button" class="button-secondary" id="developerGenerateRecoveryKeyButton">Gerar chave em espera</button>
                   <button type="button" class="button-secondary" id="developerDeviceResetButton">Limpar</button>
                   <button type="button" class="button-danger" id="developerDeviceDeleteButton" hidden>Excluir</button>
                 </div>
 
                 <div class="developer-note-card" id="developerProvisioningCard" hidden>
-                  <strong>Chave pronta para o firmware</strong>
+                  <strong id="developerProvisioningTitle">Chave pronta para o firmware</strong>
                   <code id="developerProvisioningValue"></code>
+                  <p class="hint" id="developerProvisioningHint">Use esta chave no firmware do ESP selecionado.</p>
                 </div>
               </form>
             </section>

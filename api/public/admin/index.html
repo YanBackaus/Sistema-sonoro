@@ -51,32 +51,6 @@
             <button id="refreshButton" type="button">Atualizar</button>
             <button id="logoutButton" type="button" class="button-secondary">Sair</button>
           </div>
-
-          <div class="session-summary" id="passwordChangePanel" hidden>
-            <strong>Troca de senha obrigatoria</strong>
-            <p>Esta conta entrou com uma senha provisoria. Defina uma nova senha para liberar a agenda dos ESPs.</p>
-
-            <form id="passwordChangeForm" class="stack-form">
-              <label class="field">
-                <span>Senha atual</span>
-                <input id="currentPasswordInput" type="password" placeholder="Digite a senha provisoria" autocomplete="current-password">
-              </label>
-
-              <label class="field">
-                <span>Nova senha</span>
-                <input id="newPasswordInput" type="password" placeholder="Minimo de 8 caracteres" autocomplete="new-password">
-              </label>
-
-              <label class="field">
-                <span>Confirmar nova senha</span>
-                <input id="confirmPasswordInput" type="password" placeholder="Repita a nova senha" autocomplete="new-password">
-              </label>
-
-              <div class="inline-actions">
-                <button id="changePasswordButton" type="submit">Trocar senha</button>
-              </div>
-            </form>
-          </div>
         </div>
 
         <p class="hint" id="configHint">
@@ -116,7 +90,32 @@
       </aside>
 
       <div class="workspace-stack">
-        <section class="surface workspace-hero reveal">
+        <section class="surface workspace-tabs reveal">
+          <div class="tab-switcher" role="tablist" aria-label="Abas do painel">
+            <button
+              id="agendaTabButton"
+              type="button"
+              class="tab-button tab-button-active"
+              data-workspace-tab="agenda"
+              aria-selected="true"
+            >
+              Agenda
+            </button>
+            <button
+              id="detailsTabButton"
+              type="button"
+              class="tab-button"
+              data-workspace-tab="informacoes"
+              aria-selected="false"
+            >
+              Informacoes
+            </button>
+          </div>
+        </section>
+
+        <div id="flashMessage" class="flash-message" hidden></div>
+
+        <section class="surface history-panel reveal workspace-panel" id="agendaPanel" data-workspace-panel="agenda">
           <div class="section-head">
             <div>
               <p class="section-kicker">Agenda do ESP</p>
@@ -125,30 +124,23 @@
                 Escolha um ESP da lista para ver a agenda e editar os horarios dele.
               </p>
             </div>
-            <span class="editor-badge" id="workspaceScopeBadge">Sem ESP</span>
+            <div class="schedule-head-actions">
+              <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
+              <button id="openScheduleModalButton" type="button">Cadastrar horario</button>
+            </div>
           </div>
 
-          <div class="stat-strip">
-            <div class="stat-pill">
-              <span>Status</span>
-              <strong id="summaryConnectionStatus">--</strong>
-            </div>
-            <div class="stat-pill">
-              <span>Horarios totais</span>
-              <strong id="summaryTotalSchedules">--</strong>
-            </div>
-            <div class="stat-pill">
-              <span>Horarios ativos</span>
-              <strong id="summaryActiveSchedules">--</strong>
-            </div>
-            <div class="stat-pill">
-              <span>Proximo toque</span>
-              <strong id="summaryNextAlarm">--</strong>
-            </div>
+          <div class="history-list" id="scheduleList">
+            <div class="empty-state">Entre com sua conta para carregar os horarios.</div>
           </div>
         </section>
 
-        <section class="workspace-grid">
+        <section
+          class="workspace-grid workspace-panel"
+          id="detailsPanel"
+          data-workspace-panel="informacoes"
+          hidden
+        >
           <article class="surface panel-card reveal">
             <div class="section-head">
               <div>
@@ -175,15 +167,36 @@
                 <dd id="accountDeviceCount">--</dd>
               </div>
             </div>
+          </article>
 
-            <div class="section-head section-head-spaced">
+          <article class="surface panel-card reveal">
+            <div class="section-head">
               <div>
                 <p class="section-kicker">ESP selecionado</p>
                 <h2>Informacoes basicas</h2>
               </div>
             </div>
 
-            <dl class="summary-list">
+            <div class="stat-strip stat-strip-compact">
+              <div class="stat-pill">
+                <span>Status</span>
+                <strong id="summaryConnectionStatus">--</strong>
+              </div>
+              <div class="stat-pill">
+                <span>Horarios totais</span>
+                <strong id="summaryTotalSchedules">--</strong>
+              </div>
+              <div class="stat-pill">
+                <span>Horarios ativos</span>
+                <strong id="summaryActiveSchedules">--</strong>
+              </div>
+              <div class="stat-pill">
+                <span>Proximo toque</span>
+                <strong id="summaryNextAlarm">--</strong>
+              </div>
+            </div>
+
+            <dl class="summary-list summary-list-spaced">
               <div>
                 <dt>ID do ESP</dt>
                 <dd id="summaryDeviceId">--</dd>
@@ -218,98 +231,129 @@
               </div>
             </dl>
           </article>
-
-          <article class="surface panel-card reveal">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker" id="scheduleFormKicker">Novo horario</p>
-                <h2 id="scheduleFormTitle">Cadastro rapido</h2>
-              </div>
-              <span class="editor-badge" id="scheduleEditorBadge" hidden>Criando</span>
-            </div>
-
-            <form id="scheduleForm" class="stack-form">
-              <div class="field-grid field-grid-wide">
-                <label class="field">
-                  <span>Descricao</span>
-                  <input id="scheduleLabelInput" type="text" placeholder="Entrada" autocomplete="off" required>
-                </label>
-
-                <label class="field">
-                  <span>Hora</span>
-                  <input id="scheduleHourInput" type="number" min="0" max="23" value="8" required>
-                </label>
-
-                <label class="field">
-                  <span>Minuto</span>
-                  <input id="scheduleMinuteInput" type="number" min="0" max="59" value="0" required>
-                </label>
-              </div>
-
-              <div class="field">
-                <span>Dias da semana</span>
-                <div class="day-grid" id="dayGrid">
-                  <label class="day-chip"><input type="checkbox" value="0"><span>Dom</span></label>
-                  <label class="day-chip"><input type="checkbox" value="1" checked><span>Seg</span></label>
-                  <label class="day-chip"><input type="checkbox" value="2" checked><span>Ter</span></label>
-                  <label class="day-chip"><input type="checkbox" value="3" checked><span>Qua</span></label>
-                  <label class="day-chip"><input type="checkbox" value="4" checked><span>Qui</span></label>
-                  <label class="day-chip"><input type="checkbox" value="5" checked><span>Sex</span></label>
-                  <label class="day-chip"><input type="checkbox" value="6"><span>Sab</span></label>
-                </div>
-              </div>
-
-              <div class="field-grid">
-                <label class="field">
-                  <span>Frequencia (Hz)</span>
-                  <input id="toneHzInput" type="number" min="100" max="6000" value="2400" required>
-                </label>
-
-                <label class="field">
-                  <span>Duracao (ms)</span>
-                  <input id="toneMsInput" type="number" min="50" max="10000" value="600" required>
-                </label>
-
-                <label class="field">
-                  <span>Repeticoes</span>
-                  <input id="repeatCountInput" type="number" min="1" max="10" value="1" required>
-                </label>
-
-                <label class="field">
-                  <span>Intervalo (ms)</span>
-                  <input id="repeatGapInput" type="number" min="0" max="10000" value="250" required>
-                </label>
-              </div>
-
-              <label class="toggle">
-                <input id="enabledInput" type="checkbox" checked>
-                <span>Horario ativo</span>
-              </label>
-
-              <div class="inline-actions">
-                <button id="saveScheduleButton" type="submit">Cadastrar horario</button>
-                <button id="resetScheduleButton" type="button" class="button-secondary">Limpar</button>
-              </div>
-            </form>
-          </article>
-        </section>
-
-        <section class="surface history-panel reveal">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Agenda ativa</p>
-              <h2>Horarios deste ESP</h2>
-            </div>
-            <p class="history-note" id="scheduleCountNote">Nenhum horario carregado.</p>
-          </div>
-
-          <div id="flashMessage" class="flash-message" hidden></div>
-          <div class="history-list" id="scheduleList">
-            <div class="empty-state">Entre com sua conta para carregar os horarios.</div>
-          </div>
         </section>
       </div>
     </main>
+  </div>
+
+  <div class="modal-backdrop" id="passwordChangePanel" hidden>
+    <section class="modal-card surface" role="dialog" aria-modal="true" aria-labelledby="passwordChangeTitle">
+      <div class="modal-head">
+        <div>
+          <p class="section-kicker">Seguranca</p>
+          <h2 id="passwordChangeTitle">Troca de senha obrigatoria</h2>
+        </div>
+      </div>
+
+      <p class="modal-copy">
+        Esta conta entrou com uma senha provisoria. Defina uma nova senha para liberar a agenda dos ESPs.
+      </p>
+
+      <form id="passwordChangeForm" class="stack-form">
+        <label class="field">
+          <span>Senha atual</span>
+          <input id="currentPasswordInput" type="password" placeholder="Digite a senha provisoria" autocomplete="current-password">
+        </label>
+
+        <label class="field">
+          <span>Nova senha</span>
+          <input id="newPasswordInput" type="password" placeholder="Minimo de 8 caracteres" autocomplete="new-password">
+        </label>
+
+        <label class="field">
+          <span>Confirmar nova senha</span>
+          <input id="confirmPasswordInput" type="password" placeholder="Repita a nova senha" autocomplete="new-password">
+        </label>
+
+        <div class="inline-actions modal-actions">
+          <button id="changePasswordButton" type="submit">Trocar senha</button>
+          <button id="passwordChangeLogoutButton" type="button" class="button-secondary">Sair</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="scheduleEditorPanel" hidden>
+    <section class="modal-card modal-card-wide surface" role="dialog" aria-modal="true" aria-labelledby="scheduleFormTitle">
+      <div class="modal-head modal-head-split">
+        <div>
+          <p class="section-kicker" id="scheduleFormKicker">Novo horario</p>
+          <h2 id="scheduleFormTitle">Cadastrar horario</h2>
+          <p class="modal-copy" id="scheduleFormContext">
+            Preencha os dados do novo toque para o ESP selecionado.
+          </p>
+        </div>
+
+        <div class="modal-head-actions">
+          <span class="editor-badge" id="scheduleEditorBadge">Criando</span>
+          <button id="closeScheduleModalButton" type="button" class="button-secondary">Fechar</button>
+        </div>
+      </div>
+
+      <form id="scheduleForm" class="stack-form">
+        <div class="field-grid field-grid-wide">
+          <label class="field">
+            <span>Descricao</span>
+            <input id="scheduleLabelInput" type="text" placeholder="Entrada" autocomplete="off" required>
+          </label>
+
+          <label class="field">
+            <span>Hora</span>
+            <input id="scheduleHourInput" type="number" min="0" max="23" value="8" required>
+          </label>
+
+          <label class="field">
+            <span>Minuto</span>
+            <input id="scheduleMinuteInput" type="number" min="0" max="59" value="0" required>
+          </label>
+        </div>
+
+        <div class="field">
+          <span>Dias da semana</span>
+          <div class="day-grid" id="dayGrid">
+            <label class="day-chip"><input type="checkbox" value="0"><span>Dom</span></label>
+            <label class="day-chip"><input type="checkbox" value="1" checked><span>Seg</span></label>
+            <label class="day-chip"><input type="checkbox" value="2" checked><span>Ter</span></label>
+            <label class="day-chip"><input type="checkbox" value="3" checked><span>Qua</span></label>
+            <label class="day-chip"><input type="checkbox" value="4" checked><span>Qui</span></label>
+            <label class="day-chip"><input type="checkbox" value="5" checked><span>Sex</span></label>
+            <label class="day-chip"><input type="checkbox" value="6"><span>Sab</span></label>
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <label class="field">
+            <span>Frequencia (Hz)</span>
+            <input id="toneHzInput" type="number" min="100" max="6000" value="2400" required>
+          </label>
+
+          <label class="field">
+            <span>Duracao (ms)</span>
+            <input id="toneMsInput" type="number" min="50" max="10000" value="600" required>
+          </label>
+
+          <label class="field">
+            <span>Repeticoes</span>
+            <input id="repeatCountInput" type="number" min="1" max="10" value="1" required>
+          </label>
+
+          <label class="field">
+            <span>Intervalo (ms)</span>
+            <input id="repeatGapInput" type="number" min="0" max="10000" value="250" required>
+          </label>
+        </div>
+
+        <label class="toggle">
+          <input id="enabledInput" type="checkbox" checked>
+          <span>Horario ativo</span>
+        </label>
+
+        <div class="inline-actions modal-actions">
+          <button id="saveScheduleButton" type="submit">Cadastrar horario</button>
+          <button id="resetScheduleButton" type="button" class="button-secondary">Fechar</button>
+        </div>
+      </form>
+    </section>
   </div>
 
   <script type="module" src="/admin/app.js"></script>

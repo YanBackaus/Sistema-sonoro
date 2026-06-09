@@ -43,10 +43,13 @@ const elements = {
   deviceSoundInput: document.querySelector("#developerDeviceSoundInput"),
   deviceKeyInput: document.querySelector("#developerDeviceKeyInput"),
   rotateKeyInput: document.querySelector("#developerRotateKeyInput"),
+  generateRecoveryKeyButton: document.querySelector("#developerGenerateRecoveryKeyButton"),
   deviceResetButton: document.querySelector("#developerDeviceResetButton"),
   deviceDeleteButton: document.querySelector("#developerDeviceDeleteButton"),
   deviceProvisioningCard: document.querySelector("#developerProvisioningCard"),
+  deviceProvisioningTitle: document.querySelector("#developerProvisioningTitle"),
   deviceProvisioningValue: document.querySelector("#developerProvisioningValue"),
+  deviceProvisioningHint: document.querySelector("#developerProvisioningHint"),
   selectedDeviceBanner: document.querySelector("#developerSelectedDeviceBanner"),
   deviceSummary: document.querySelector("#developerDeviceSummary"),
   deploymentHistory: document.querySelector("#developerDeploymentHistory"),
@@ -127,6 +130,7 @@ function bindEvents() {
   elements.userDeleteButton.addEventListener("click", deleteSelectedUser);
 
   elements.deviceForm.addEventListener("submit", submitDeviceForm);
+  elements.generateRecoveryKeyButton.addEventListener("click", generateRecoveryKeyForSelectedDevice);
   elements.deviceResetButton.addEventListener("click", resetDeviceForm);
   elements.deviceDeleteButton.addEventListener("click", deleteSelectedDevice);
 
@@ -454,6 +458,9 @@ function renderDeviceList() {
       const deploymentLabel = latestDeployment
         ? `${statusLabel(latestDeployment.status)} ${escapeHtml(latestDeployment.release.version)}`
         : "Sem deploy recente";
+      const recoveryLabel = device.pending_device_api_key_last4
+        ? `Nova chave ...${escapeHtml(device.pending_device_api_key_last4)}`
+        : "";
 
       return `
         <button
@@ -478,6 +485,7 @@ function renderDeviceList() {
             <span class="developer-badge">${escapeHtml(device.location || "Sem local")}</span>
             <span class="developer-badge">FW ${escapeHtml(device.firmware_version || "--")}</span>
             <span class="developer-badge ${deploymentBadgeClass(latestDeployment?.status)}">${deploymentLabel}</span>
+            ${recoveryLabel ? `<span class="developer-badge developer-badge-warning">${recoveryLabel}</span>` : ""}
           </div>
         </button>
       `;
@@ -511,9 +519,12 @@ function renderSelectedDeviceBanner() {
   }
 
   const online = inferDeviceOnline(selectedDevice);
+  const pendingKeyLabel = selectedDevice.pending_device_api_key_last4
+    ? `Nova chave em espera ...${selectedDevice.pending_device_api_key_last4}`
+    : "Sem chave em espera";
   elements.selectedDeviceBanner.innerHTML = `
     <strong>${renderSelectionIndicator("ESP selecionado")} ${escapeHtml(selectedDevice.name || selectedDevice.device_id)}</strong>
-    <p>${escapeHtml(selectedDevice.device_id)} - ${escapeHtml(selectedDevice.location || "Sem local")} - ${online ? "online" : "sem contato"}</p>
+    <p>${escapeHtml(selectedDevice.device_id)} - ${escapeHtml(selectedDevice.location || "Sem local")} - ${online ? "online" : "sem contato"} - ${escapeHtml(pendingKeyLabel)}</p>
   `;
 }
 
@@ -555,6 +566,7 @@ function fillDeviceForm(device) {
   elements.deviceSoundInput.checked = Boolean(device.sound_enabled);
   elements.deviceKeyInput.value = "";
   elements.rotateKeyInput.checked = false;
+  elements.generateRecoveryKeyButton.hidden = false;
   elements.deviceDeleteButton.hidden = false;
 }
 
@@ -568,6 +580,7 @@ function applyBlankDeviceForm() {
   elements.devicePollInput.value = "60";
   elements.deviceUtcOffsetInput.value = "-180";
   elements.deviceSoundInput.checked = true;
+  elements.generateRecoveryKeyButton.hidden = true;
   elements.deviceDeleteButton.hidden = true;
   hideDeviceProvisioningCard();
 }
@@ -613,12 +626,42 @@ async function submitDeviceForm(event) {
       ? {
           deviceId: response.device.device_id,
           deviceApiKey: response.provisioning.device_api_key,
+          staged: Boolean(response.provisioning.staged),
         }
       : null;
 
     await refreshOverview(`ESP ${response.device.device_id} salvo.`);
   } catch (error) {
     handlePortalError(error, "Nao foi possivel salvar o ESP.");
+  }
+}
+
+async function generateRecoveryKeyForSelectedDevice() {
+  const deviceId = state.selectedDeviceId;
+  if (!deviceId) {
+    setBanner("Escolha um ESP antes de gerar a chave em espera.", "error");
+    return;
+  }
+
+  setBanner("Gerando chave em espera...", "");
+
+  try {
+    const response = await fetchJson(`/api/developer/devices/${encodeURIComponent(deviceId)}/recovery-key`, {
+      method: "POST",
+    });
+
+    state.selectedDeviceId = response.device.device_id;
+    state.deviceProvisioning = response.provisioning
+      ? {
+          deviceId: response.device.device_id,
+          deviceApiKey: response.provisioning.device_api_key,
+          staged: Boolean(response.provisioning.staged),
+        }
+      : null;
+
+    await refreshOverview(`Chave em espera gerada para ${response.device.device_id}.`);
+  } catch (error) {
+    handlePortalError(error, "Nao foi possivel gerar a chave em espera.");
   }
 }
 
@@ -673,8 +716,14 @@ function renderDeviceSummary(device) {
       <div class="developer-summary-line"><span>Ultimo contato</span><strong>${formatDateTime(device.last_seen_at)}</strong></div>
       <div class="developer-summary-line"><span>Firmware atual</span><strong>${escapeHtml(device.firmware_version || "--")}</strong></div>
       <div class="developer-summary-line"><span>Horarios ativos</span><strong>${activeSchedules}</strong></div>
-      <div class="developer-summary-line"><span>Chave</span><strong>${device.device_api_key_last4 ? `...${escapeHtml(device.device_api_key_last4)}` : "Sem chave"}</strong></div>
+      <div class="developer-summary-line"><span>Chave ativa</span><strong>${device.device_api_key_last4 ? `...${escapeHtml(device.device_api_key_last4)}` : "Sem chave"}</strong></div>
+      <div class="developer-summary-line"><span>Chave em espera</span><strong>${device.pending_device_api_key_last4 ? `...${escapeHtml(device.pending_device_api_key_last4)}` : "Nenhuma"}</strong></div>
     </div>
+    <p class="developer-card-copy developer-card-copy-spaced">
+      ${device.pending_device_api_key_last4
+        ? "A chave atual continua valendo. Assim que o ESP usar a chave em espera, a troca vira definitiva automaticamente."
+        : "Sem troca de chave pendente para este ESP."}
+    </p>
   `;
 }
 
@@ -804,6 +853,7 @@ function renderBuildPlan() {
     state.deviceProvisioning &&
     state.deviceProvisioning.deviceId === plan.target.device_id &&
     state.deviceProvisioning.deviceApiKey;
+  const generatedKeyIsPending = hasCurrentKey && Boolean(state.deviceProvisioning.staged);
 
   const checklist = Array.isArray(plan.checklist)
     ? plan.checklist.map((item) => `<span class="developer-badge">${escapeHtml(item)}</span>`).join("")
@@ -818,7 +868,7 @@ function renderBuildPlan() {
       <div class="developer-summary-line"><span>Sketch</span><strong>${escapeHtml(plan.files.sketch_path)}</strong></div>
       <div class="developer-summary-line"><span>Chave esperada</span><strong>${escapeHtml(plan.target.expected_device_key_last4 ? `...${plan.target.expected_device_key_last4}` : "Sem final salvo")}</strong></div>
     </div>
-    ${hasCurrentKey ? `<p class="developer-card-copy developer-card-copy-spaced">A chave atual deste ESP foi gerada nesta sessao. Use-a no comando abaixo.</p>` : ""}
+    ${hasCurrentKey ? `<p class="developer-card-copy developer-card-copy-spaced">${generatedKeyIsPending ? "A chave em espera deste ESP foi gerada nesta sessao. Use-a no firmware e a API promove automaticamente no primeiro contato." : "A chave ativa deste ESP foi gerada nesta sessao. Use-a no comando abaixo."}</p>` : ""}
     <div class="developer-meta-grid">${checklist}</div>
     <p class="developer-card-copy developer-card-copy-spaced">Comando sugerido</p>
     <pre class="developer-code-block">${escapeHtml(plan.build.powerShell_command)}</pre>
@@ -1030,14 +1080,22 @@ function syncUserProvisioningCard() {
   hideUserProvisioningCard();
 }
 
-function showDeviceProvisioningCard(deviceApiKey) {
+function showDeviceProvisioningCard(deviceApiKey, options = {}) {
   elements.deviceProvisioningCard.hidden = false;
+  elements.deviceProvisioningTitle.textContent = options.staged
+    ? "Chave em espera pronta para o firmware"
+    : "Chave pronta para o firmware";
   elements.deviceProvisioningValue.textContent = deviceApiKey;
+  elements.deviceProvisioningHint.textContent = options.staged
+    ? "A chave atual continua funcionando. Grave esta nova chave no ESP e, no primeiro contato com ela, a API conclui a troca automaticamente."
+    : "Essa chave ja substituiu a anterior no cadastro. Grave-a no firmware antes de reconectar o ESP.";
 }
 
 function hideDeviceProvisioningCard() {
   elements.deviceProvisioningCard.hidden = true;
+  elements.deviceProvisioningTitle.textContent = "Chave pronta para o firmware";
   elements.deviceProvisioningValue.textContent = "";
+  elements.deviceProvisioningHint.textContent = "Use esta chave no firmware do ESP selecionado.";
 }
 
 function syncDeviceProvisioningCard() {
@@ -1046,7 +1104,9 @@ function syncDeviceProvisioningCard() {
     state.selectedDeviceId &&
     state.deviceProvisioning.deviceId === state.selectedDeviceId
   ) {
-    showDeviceProvisioningCard(state.deviceProvisioning.deviceApiKey);
+    showDeviceProvisioningCard(state.deviceProvisioning.deviceApiKey, {
+      staged: Boolean(state.deviceProvisioning.staged),
+    });
     return;
   }
 

@@ -38,6 +38,9 @@ async function upsertDevice(pool, device, securityConfig) {
   let provisionedKey = null;
   let deviceApiKeyHash = currentAuth?.device_api_key_hash || null;
   let deviceApiKeyLast4 = currentAuth?.device_api_key_last4 || null;
+  let pendingDeviceApiKeyHash = currentAuth?.pending_device_api_key_hash || null;
+  let pendingDeviceApiKeyLast4 = currentAuth?.pending_device_api_key_last4 || null;
+  let pendingDeviceApiKeyCreatedAt = currentAuth?.pending_device_api_key_created_at || null;
 
   if (device.device_api_key) {
     provisionedKey = device.device_api_key;
@@ -48,6 +51,9 @@ async function upsertDevice(pool, device, securityConfig) {
   if (provisionedKey) {
     deviceApiKeyHash = hashDeviceApiKey(provisionedKey, securityConfig.deviceKeyPepper);
     deviceApiKeyLast4 = getKeyLast4(provisionedKey);
+    pendingDeviceApiKeyHash = null;
+    pendingDeviceApiKeyLast4 = null;
+    pendingDeviceApiKeyCreatedAt = null;
   }
 
   await pool.execute(
@@ -63,7 +69,10 @@ async function upsertDevice(pool, device, securityConfig) {
       utc_offset_minutes,
       poll_interval_seconds,
       device_api_key_hash,
-      device_api_key_last4
+      device_api_key_last4,
+      pending_device_api_key_hash,
+      pending_device_api_key_last4,
+      pending_device_api_key_created_at
     ) VALUES (
       :device_id,
       :owner_user_id,
@@ -76,7 +85,10 @@ async function upsertDevice(pool, device, securityConfig) {
       :utc_offset_minutes,
       :poll_interval_seconds,
       :device_api_key_hash,
-      :device_api_key_last4
+      :device_api_key_last4,
+      :pending_device_api_key_hash,
+      :pending_device_api_key_last4,
+      :pending_device_api_key_created_at
     )
     ON DUPLICATE KEY UPDATE
       owner_user_id = VALUES(owner_user_id),
@@ -89,7 +101,10 @@ async function upsertDevice(pool, device, securityConfig) {
       utc_offset_minutes = VALUES(utc_offset_minutes),
       poll_interval_seconds = VALUES(poll_interval_seconds),
       device_api_key_hash = VALUES(device_api_key_hash),
-      device_api_key_last4 = VALUES(device_api_key_last4)`,
+      device_api_key_last4 = VALUES(device_api_key_last4),
+      pending_device_api_key_hash = VALUES(pending_device_api_key_hash),
+      pending_device_api_key_last4 = VALUES(pending_device_api_key_last4),
+      pending_device_api_key_created_at = VALUES(pending_device_api_key_created_at)`,
     {
       device_id: device.device_id,
       owner_user_id: device.owner_user_id,
@@ -103,6 +118,9 @@ async function upsertDevice(pool, device, securityConfig) {
       poll_interval_seconds: device.poll_interval_seconds,
       device_api_key_hash: deviceApiKeyHash,
       device_api_key_last4: deviceApiKeyLast4,
+      pending_device_api_key_hash: pendingDeviceApiKeyHash,
+      pending_device_api_key_last4: pendingDeviceApiKeyLast4,
+      pending_device_api_key_created_at: pendingDeviceApiKeyCreatedAt,
     }
   );
 
@@ -112,6 +130,7 @@ async function upsertDevice(pool, device, securityConfig) {
       ? {
           device_api_key: provisionedKey,
           device_api_key_last4: deviceApiKeyLast4,
+          staged: false,
         }
       : null,
   };
@@ -138,7 +157,10 @@ async function listDevices(pool) {
       d.last_rssi,
       d.firmware_version,
       d.device_api_key_last4,
+      d.pending_device_api_key_last4,
+      d.pending_device_api_key_created_at,
       CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
+      CASE WHEN d.pending_device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_pending_device_api_key,
       cu.company_name AS owner_company_name,
       (
         SELECT COUNT(*)
@@ -174,7 +196,10 @@ async function getDeviceDetails(pool, deviceId) {
       d.current_screen,
       d.current_menu,
       d.device_api_key_last4,
+      d.pending_device_api_key_last4,
+      d.pending_device_api_key_created_at,
       CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
+      CASE WHEN d.pending_device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_pending_device_api_key,
       cu.company_name AS owner_company_name,
       d.created_at,
       d.updated_at
@@ -201,7 +226,10 @@ async function getDeviceAuthRecord(pool, deviceId) {
     `SELECT
       device_id,
       device_api_key_hash,
-      device_api_key_last4
+      device_api_key_last4,
+      pending_device_api_key_hash,
+      pending_device_api_key_last4,
+      pending_device_api_key_created_at
     FROM devices
     WHERE device_id = :device_id`,
     { device_id: deviceId }
@@ -299,7 +327,10 @@ async function getClientUserDetails(pool, userId) {
       d.current_screen,
       d.current_menu,
       d.device_api_key_last4,
+      d.pending_device_api_key_last4,
+      d.pending_device_api_key_created_at,
       CASE WHEN d.device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_device_api_key,
+      CASE WHEN d.pending_device_api_key_hash IS NULL THEN 0 ELSE 1 END AS has_pending_device_api_key,
       cu.company_name AS owner_company_name,
       (
         SELECT COUNT(*)
@@ -319,6 +350,64 @@ async function getClientUserDetails(pool, userId) {
     ...user,
     devices: devices.map(formatDeviceRow),
   };
+}
+
+async function stageDeviceRecoveryKey(pool, deviceId, securityConfig) {
+  const currentAuth = await getDeviceAuthRecord(pool, deviceId);
+  if (!currentAuth) {
+    return null;
+  }
+
+  const provisionedKey = generateDeviceApiKey();
+  await pool.execute(
+    `UPDATE devices
+    SET
+      pending_device_api_key_hash = :pending_device_api_key_hash,
+      pending_device_api_key_last4 = :pending_device_api_key_last4,
+      pending_device_api_key_created_at = UTC_TIMESTAMP()
+    WHERE device_id = :device_id`,
+    {
+      device_id: deviceId,
+      pending_device_api_key_hash: hashDeviceApiKey(provisionedKey, securityConfig.deviceKeyPepper),
+      pending_device_api_key_last4: getKeyLast4(provisionedKey),
+    }
+  );
+
+  const device = await getDeviceDetails(pool, deviceId);
+  return {
+    device,
+    provisioning: {
+      device_api_key: provisionedKey,
+      device_api_key_last4: getKeyLast4(provisionedKey),
+      staged: true,
+      auto_promotes_on_first_use: true,
+    },
+  };
+}
+
+async function promotePendingDeviceApiKey(pool, deviceId) {
+  const currentAuth = await getDeviceAuthRecord(pool, deviceId);
+  if (!currentAuth?.pending_device_api_key_hash) {
+    return null;
+  }
+
+  await pool.execute(
+    `UPDATE devices
+    SET
+      device_api_key_hash = :device_api_key_hash,
+      device_api_key_last4 = :device_api_key_last4,
+      pending_device_api_key_hash = NULL,
+      pending_device_api_key_last4 = NULL,
+      pending_device_api_key_created_at = NULL
+    WHERE device_id = :device_id`,
+    {
+      device_id: deviceId,
+      device_api_key_hash: currentAuth.pending_device_api_key_hash,
+      device_api_key_last4: currentAuth.pending_device_api_key_last4,
+    }
+  );
+
+  return getDeviceDetails(pool, deviceId);
 }
 
 async function getClientUserAuthRecordByIdentifier(pool, identifier) {
@@ -1238,6 +1327,9 @@ function formatDeviceRow(row) {
     active_schedule_count: row.active_schedule_count,
     has_device_api_key: Boolean(row.has_device_api_key),
     device_api_key_last4: row.device_api_key_last4 || null,
+    has_pending_device_api_key: Boolean(row.has_pending_device_api_key),
+    pending_device_api_key_last4: row.pending_device_api_key_last4 || null,
+    pending_device_api_key_created_at: row.pending_device_api_key_created_at || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -1350,6 +1442,8 @@ module.exports = {
   updateSchedule,
   updateScheduleEnabled,
   deleteSchedule,
+  stageDeviceRecoveryKey,
+  promotePendingDeviceApiKey,
   upsertClientUser,
   upsertDevice,
   updateClientUserPassword,

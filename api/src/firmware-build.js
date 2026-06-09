@@ -12,10 +12,11 @@ function buildFirmwareBuildPlan(config, options) {
   const binaryPath = path.join(outputDirectory, binaryFilename);
   const firmwareUrl = normalizeFirmwareUrl(options.firmwareUrl || `/firmware/${binaryFilename}`);
   const secretsPath = path.join(path.dirname(sketchPath), "secrets.h");
+  const expectedDeviceKeyLast4 = device.pending_device_api_key_last4 || device.device_api_key_last4 || null;
   const deviceKeyPlaceholder =
     options.deviceApiKeyPlaceholder ||
-    (device.device_api_key_last4
-      ? `COLE_AQUI_A_CHAVE_QUE_TERMINA_COM_${device.device_api_key_last4}`
+    (expectedDeviceKeyLast4
+      ? `COLE_AQUI_A_CHAVE_QUE_TERMINA_COM_${expectedDeviceKeyLast4}`
       : "COLE_AQUI_A_CHAVE_DO_ESP");
 
   const releaseNotes = options.notes || `Build individual do ESP ${device.device_id}.`;
@@ -59,7 +60,10 @@ function buildFirmwareBuildPlan(config, options) {
       owner_company_name: device.owner_company_name || null,
       hardware_model: device.hardware_model || "lolin_d1_mini",
       firmware_profile: device.firmware_profile || device.device_id,
-      expected_device_key_last4: device.device_api_key_last4 || null,
+      active_device_key_last4: device.device_api_key_last4 || null,
+      pending_device_key_last4: device.pending_device_api_key_last4 || null,
+      expected_device_key_last4: expectedDeviceKeyLast4,
+      recovery_key_pending: Boolean(device.pending_device_api_key_last4),
     },
     release: {
       version,
@@ -91,6 +95,9 @@ function buildFirmwareBuildPlan(config, options) {
     secrets_template: secretsTemplate,
     checklist: [
       "Confirme se a chave do ESP termina com os 4 digitos esperados antes de compilar.",
+      device.pending_device_api_key_last4
+        ? "Existe uma chave em espera. Quando o ESP usar essa nova chave pela primeira vez, a API troca automaticamente."
+        : "Sem chave em espera: o build vai usar a chave ativa cadastrada hoje.",
       "Gere o .bin localmente e salve-o em api/public/firmware para a OTA baixar esse arquivo.",
       "Depois da compilacao, cadastre a release usando o release_code sugerido para manter o rastreio.",
     ],
