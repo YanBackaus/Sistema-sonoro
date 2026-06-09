@@ -272,6 +272,7 @@ pre,
   color: var(--text);
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid var(--line);
+  padding: 18px 18px 18px 30px;
   box-shadow: none;
   transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
@@ -279,8 +280,8 @@ pre,
 .developer-device-card::before {
   content: "";
   position: absolute;
-  inset: 12px auto 12px 12px;
-  width: 4px;
+  inset: 14px auto 14px 14px;
+  width: 3px;
   border-radius: 999px;
   background: transparent;
 }
@@ -398,12 +399,23 @@ pre,
   font-size: 0.74rem;
 }
 
+.developer-meta-grid .developer-selection-indicator {
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 0.68rem;
+}
+
 .developer-selection-checkbox {
   width: 16px;
   height: 16px;
   margin: 0;
   accent-color: var(--accent);
   pointer-events: none;
+}
+
+.developer-meta-grid .developer-selection-checkbox {
+  width: 14px;
+  height: 14px;
 }
 
 .developer-summary-selection {

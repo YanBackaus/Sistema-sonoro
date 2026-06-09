@@ -475,7 +475,7 @@ function renderDeviceList() {
               <p class="developer-card-copy">${escapeHtml(device.device_id)} - ${escapeHtml(ownerLabel)}</p>
             </div>
             <div class="developer-meta-grid">
-              ${isActive ? renderSelectionIndicator("ESP selecionado") : ""}
+              ${isActive ? renderSelectionIndicator("Selecionado") : ""}
               <span class="developer-badge ${online ? "developer-badge-success" : ""}">
                 ${online ? "Online" : "Sem contato"}
               </span>

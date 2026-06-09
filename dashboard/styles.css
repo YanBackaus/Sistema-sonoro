@@ -987,6 +987,21 @@ button:active {
     flex: 1 1 100%;
   }
 
+  #passwordChangePanel .modal-actions {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  #passwordChangePanel .modal-actions button {
+    width: auto;
+    min-height: 56px;
+    padding: 12px 14px;
+    flex: 1 1 0;
+  }
+
   #scheduleEditorPanel .field-grid,
   #scheduleEditorPanel .field-grid-wide {
     grid-template-columns: 1fr;
@@ -1019,6 +1034,12 @@ button:active {
 @media (max-width: 540px) {
   .stat-strip {
     grid-template-columns: 1fr;
+  }
+
+  #passwordChangePanel .modal-actions button {
+    min-height: 52px;
+    padding: 11px 12px;
+    font-size: 0.96rem;
   }
 
   #scheduleEditorPanel .day-chip span {
