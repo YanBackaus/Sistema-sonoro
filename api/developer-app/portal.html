@@ -14,11 +14,11 @@
     <header class="developer-hero">
       <div>
         <p class="eyebrow">Desenvolvedor</p>
-        <h1>Painel de usuarios, ESPs e OTA</h1>
-        <p class="developer-copy">Centralize usuarios, donos de ESPs e releases OTA com mais controle sobre cada firmware.</p>
+        <h1>Painel de usu&aacute;rios, ESPs e OTA</h1>
+        <p class="developer-copy">Centralize usu&aacute;rios, donos de ESPs e releases OTA com mais controle sobre cada firmware.</p>
       </div>
       <div class="developer-toolbar">
-        <span class="developer-chip" id="developerSessionChip">Sessao ativa</span>
+        <span class="developer-chip" id="developerSessionChip">Sess&atilde;o ativa</span>
         <button type="button" class="button-secondary" id="developerRefreshButton">Atualizar</button>
         <button type="button" class="button-secondary" id="developerLogoutButton">Sair</button>
       </div>
@@ -26,7 +26,7 @@
 
     <section class="developer-stats">
       <article class="developer-stat-card">
-        <span>Usuarios</span>
+        <span>Usu&aacute;rios</span>
         <strong id="statUsers">--</strong>
       </article>
       <article class="developer-stat-card">
@@ -50,9 +50,9 @@
     <p class="developer-banner" id="developerBanner">Carregando portal...</p>
 
     <nav class="developer-tabs" aria-label="Abas do desenvolvedor">
-      <button type="button" class="developer-tab-button is-active" data-tab="users">Usuarios</button>
+      <button type="button" class="developer-tab-button is-active" data-tab="users">Usu&aacute;rios</button>
       <button type="button" class="developer-tab-button" data-tab="devices">ESPs</button>
-      <button type="button" class="developer-tab-button" data-tab="updates">Updates</button>
+      <button type="button" class="developer-tab-button" data-tab="updates">Atualiza&ccedil;&otilde;es</button>
     </nav>
 
     <main class="developer-tab-panels">
@@ -61,13 +61,13 @@
           <section class="developer-panel developer-panel-tall">
             <div class="developer-panel-head">
               <div>
-                <p class="section-kicker">Usuarios</p>
+                <p class="section-kicker">Usu&aacute;rios</p>
                 <h2>Clientes cadastrados</h2>
               </div>
             </div>
 
             <div class="developer-list" id="developerUserList">
-              <div class="empty-state">Nenhum usuario carregado.</div>
+              <div class="empty-state">Nenhum usu&aacute;rio carregado.</div>
             </div>
           </section>
 
@@ -76,14 +76,14 @@
               <div class="developer-panel-head">
                 <div>
                   <p class="section-kicker">Cadastro</p>
-                  <h2 id="developerUserTitle">Novo usuario</h2>
+                  <h2 id="developerUserTitle">Novo usu&aacute;rio</h2>
                 </div>
               </div>
 
               <form id="developerUserForm" class="stack-form">
                 <div class="field-grid">
                   <label class="field">
-                    <span>ID do usuario</span>
+                    <span>ID do usu&aacute;rio</span>
                     <input id="developerUserIdInput" type="text" placeholder="empresa_alpha" autocomplete="off" required>
                   </label>
                   <label class="field">
@@ -95,16 +95,10 @@
                   </label>
                 </div>
 
-                <div class="field-grid">
-                  <label class="field">
-                    <span>Empresa</span>
-                    <input id="developerUserCompanyInput" type="text" placeholder="Empresa Alpha" autocomplete="off" required>
-                  </label>
-                  <label class="field">
-                    <span>Contato</span>
-                    <input id="developerUserContactInput" type="text" placeholder="Responsavel" autocomplete="off">
-                  </label>
-                </div>
+                <label class="field">
+                  <span>Empresa</span>
+                  <input id="developerUserCompanyInput" type="text" placeholder="Empresa Alpha" autocomplete="off" required>
+                </label>
 
                 <label class="field">
                   <span>Senha (opcional)</span>
@@ -113,19 +107,19 @@
 
                 <label class="toggle">
                   <input id="developerUserRotatePasswordInput" type="checkbox">
-                  <span>Gerar nova senha provisoria ao salvar</span>
+                  <span>Gerar nova senha provis&oacute;ria ao salvar</span>
                 </label>
 
                 <div class="developer-inline-actions">
-                  <button type="submit">Salvar usuario</button>
+                  <button type="submit">Salvar usu&aacute;rio</button>
                   <button type="button" class="button-secondary" id="developerUserResetButton">Limpar</button>
                   <button type="button" class="button-danger" id="developerUserDeleteButton" hidden>Excluir</button>
                 </div>
 
                 <div class="developer-note-card" id="developerUserProvisioningCard" hidden>
-                  <strong id="developerUserProvisioningTitle">Senha provisoria gerada</strong>
+                  <strong id="developerUserProvisioningTitle">Senha provis&oacute;ria gerada</strong>
                   <code id="developerUserProvisioningValue"></code>
-                  <p class="hint" id="developerUserProvisioningHint">Ela comeca com Haxis- e o usuario precisa trocar essa senha no primeiro login.</p>
+                  <p class="hint" id="developerUserProvisioningHint">Ela come&ccedil;a com Haxis- e o usu&aacute;rio precisa trocar essa senha no primeiro login.</p>
                 </div>
               </form>
             </section>
@@ -134,12 +128,12 @@
               <div class="developer-panel-head">
                 <div>
                   <p class="section-kicker">Resumo</p>
-                  <h2>Usuario selecionado</h2>
+                  <h2>Usu&aacute;rio selecionado</h2>
                 </div>
               </div>
 
               <div class="developer-note-card developer-summary-card" id="developerUserSummary">
-                <strong>Nenhum usuario selecionado</strong>
+                <strong>Nenhum usu&aacute;rio selecionado</strong>
                 <p>Escolha um cliente para ver os ESPs vinculados e conferir o status da conta.</p>
               </div>
             </section>
@@ -190,9 +184,9 @@
 
                 <div class="field-grid">
                   <label class="field">
-                    <span>Usuario dono</span>
+                    <span>Usu&aacute;rio dono</span>
                     <select id="developerDeviceOwnerInput">
-                      <option value="">Sem usuario</option>
+                      <option value="">Sem usu&aacute;rio</option>
                     </select>
                   </label>
                   <label class="field">
@@ -203,8 +197,8 @@
 
                 <div class="field-grid">
                   <label class="field">
-                    <span>Titulo no menu</span>
-                    <input id="developerDeviceMenuInput" type="text" placeholder="Corredor" autocomplete="off">
+                    <span>T&iacute;tulo no menu</span>
+                    <input id="developerDeviceMenuInput" type="text" placeholder="Igual ao local" autocomplete="off" readonly>
                   </label>
                   <label class="field">
                     <span>Hardware</span>
@@ -269,11 +263,11 @@
 
               <div class="developer-note-card developer-summary-card" id="developerDeviceSummary">
                 <strong>Nenhum ESP selecionado</strong>
-                <p>Escolha um dispositivo para ver dono, chave parcial, versao atual e historico de deploy.</p>
+                <p>Escolha um dispositivo para ver dono, chave parcial, vers&atilde;o atual e hist&oacute;rico de deploy.</p>
               </div>
 
               <div class="developer-release-list" id="developerDeploymentHistory">
-                <div class="empty-state">Nenhum deployment para mostrar.</div>
+                <div class="empty-state">Nenhum deploy para mostrar.</div>
               </div>
             </section>
           </div>
@@ -286,7 +280,7 @@
             <section class="developer-panel">
               <div class="developer-panel-head">
                 <div>
-                  <p class="section-kicker">Build</p>
+                  <p class="section-kicker">Compila&ccedil;&atilde;o</p>
                   <h2>Plano do .bin</h2>
                 </div>
               </div>
@@ -300,7 +294,7 @@
                     </select>
                   </label>
                   <label class="field">
-                    <span>Versao</span>
+                    <span>Vers&atilde;o</span>
                     <input id="developerBuildPlanVersionInput" type="text" placeholder="1.0.1" autocomplete="off" required>
                   </label>
                 </div>
@@ -318,7 +312,7 @@
 
               <div class="developer-note-card developer-summary-card" id="developerBuildPlanCard">
                 <strong>Nenhum plano gerado</strong>
-                <p>Selecione um ESP e uma versao para montar o release_code, o nome do .bin e o comando sugerido.</p>
+                <p>Selecione um ESP e uma vers&atilde;o para montar o release_code, o nome do .bin e o comando sugerido.</p>
               </div>
             </section>
 
@@ -333,11 +327,11 @@
               <form id="developerReleaseForm" class="stack-form">
                 <div class="field-grid">
                   <label class="field">
-                    <span>Release code</span>
+                    <span>C&oacute;digo da release</span>
                     <input id="developerReleaseCodeInput" type="text" placeholder="stable-d1mini_03-1-0-1" autocomplete="off">
                   </label>
                   <label class="field">
-                    <span>Versao</span>
+                    <span>Vers&atilde;o</span>
                     <input id="developerReleaseVersionInput" type="text" placeholder="1.0.1" autocomplete="off" required>
                   </label>
                 </div>
@@ -351,7 +345,7 @@
                     <span>Alvo</span>
                     <select id="developerReleaseTargetTypeInput">
                       <option value="all">Todos</option>
-                      <option value="user">Usuario</option>
+                      <option value="user">Usu&aacute;rio</option>
                       <option value="device">ESP</option>
                     </select>
                   </label>
@@ -359,9 +353,9 @@
 
                 <div class="field-grid">
                   <label class="field" id="developerReleaseTargetUserField" hidden>
-                    <span>Usuario alvo</span>
+                    <span>Usu&aacute;rio alvo</span>
                     <select id="developerReleaseTargetUserInput">
-                      <option value="">Selecione um usuario</option>
+                      <option value="">Selecione um usu&aacute;rio</option>
                     </select>
                   </label>
                   <label class="field" id="developerReleaseTargetDeviceField" hidden>
@@ -395,12 +389,12 @@
 
                 <label class="field">
                   <span>SHA-256 (opcional)</span>
-                  <input id="developerReleaseShaInput" type="text" placeholder="Hash do binario" autocomplete="off">
+                  <input id="developerReleaseShaInput" type="text" placeholder="Hash do bin&aacute;rio" autocomplete="off">
                 </label>
 
                 <label class="field">
                   <span>Notas</span>
-                  <textarea id="developerReleaseNotesInput" rows="4" placeholder="Resumo da versao"></textarea>
+                  <textarea id="developerReleaseNotesInput" rows="4" placeholder="Resumo da vers&atilde;o"></textarea>
                 </label>
 
                 <button type="submit">Salvar release</button>
@@ -434,14 +428,14 @@
                   </select>
                 </label>
 
-                <button type="submit">Enviar atualizacao</button>
+                <button type="submit">Enviar atualiza&ccedil;&atilde;o</button>
               </form>
             </section>
 
             <section class="developer-panel">
               <div class="developer-panel-head">
                 <div>
-                  <p class="section-kicker">Historico</p>
+                  <p class="section-kicker">Hist&oacute;rico</p>
                   <h2>Releases cadastradas</h2>
                 </div>
               </div>

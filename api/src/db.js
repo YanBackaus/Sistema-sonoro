@@ -6,6 +6,7 @@ const {
   hashDeviceApiKey,
   hashPassword,
 } = require("./security");
+const { ValidationError } = require("./validation");
 
 function createDatabasePool(mysqlConfig) {
   const poolConfig = {
@@ -410,8 +411,8 @@ async function promotePendingDeviceApiKey(pool, deviceId) {
   return getDeviceDetails(pool, deviceId);
 }
 
-async function getClientUserAuthRecordByIdentifier(pool, identifier) {
-  const normalized = String(identifier || "").trim().toLowerCase();
+async function getClientUserAuthRecordByUserId(pool, userId) {
+  const normalized = String(userId || "").trim().toLowerCase();
   const [rows] = await pool.execute(
     `SELECT
       user_id,
@@ -422,16 +423,49 @@ async function getClientUserAuthRecordByIdentifier(pool, identifier) {
       password_temporary,
       status
     FROM client_users
-    WHERE user_id = :identifier
+    WHERE user_id = :user_id
     LIMIT 1`,
-    { identifier: normalized }
+    { user_id: normalized }
   );
 
   return rows.length ? rows[0] : null;
 }
 
+async function getClientUserAuthRecordByCompanyName(pool, companyName) {
+  const normalized = String(companyName || "").trim().toLowerCase();
+  const [rows] = await pool.execute(
+    `SELECT
+      user_id,
+      company_name,
+      contact_name,
+      email,
+      password_hash,
+      password_temporary,
+      status
+    FROM client_users
+    WHERE LOWER(TRIM(company_name)) = :company_name
+    ORDER BY updated_at DESC, user_id ASC
+    LIMIT 2`,
+    { company_name: normalized }
+  );
+
+  if (rows.length > 1) {
+    throw new ValidationError(
+      "Existe mais de uma conta com esse nome de empresa. Ajuste os cadastros antes de liberar o login."
+    );
+  }
+
+  return rows.length ? rows[0] : null;
+}
+
 async function upsertClientUser(pool, user) {
-  const existing = await getClientUserAuthRecordByIdentifier(pool, user.user_id);
+  const existing = await getClientUserAuthRecordByUserId(pool, user.user_id);
+  const existingCompany = await getClientUserAuthRecordByCompanyName(pool, user.company_name);
+
+  if (existingCompany && existingCompany.user_id !== user.user_id) {
+    throw new ValidationError("O nome da empresa precisa ser unico.");
+  }
+
   let passwordHash = null;
   let provisionedPassword = null;
   let passwordTemporary = existing ? Boolean(existing.password_temporary) : false;
@@ -1420,7 +1454,8 @@ module.exports = {
   createFirmwareRelease,
   createDatabasePool,
   deleteDeviceById,
-  getClientUserAuthRecordByIdentifier,
+  getClientUserAuthRecordByCompanyName,
+  getClientUserAuthRecordByUserId,
   getClientUserById,
   getClientUserDetails,
   getDeveloperDeviceDetails,

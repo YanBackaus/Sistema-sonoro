@@ -15,7 +15,7 @@ O menu do firmware foi reorganizado com a mesma ideia de maquina de estados do a
 
 ## Arquitetura
 
-`API Node.js + MySQL <-> D1 mini + buzzer + OLED + encoder`
+`API Node.js + MySQL <-> D1 mini + relé + OLED + encoder`
 
 ### Papel da API
 
@@ -29,7 +29,7 @@ O menu do firmware foi reorganizado com a mesma ideia de maquina de estados do a
 
 - consultar a API periodicamente
 - manter relogio sincronizado
-- tocar buzzer nos horarios programados
+- acionar o relé nos horários programados
 - permitir navegacao local no OLED
 
 ## Estrutura
@@ -392,7 +392,7 @@ Arquivo principal:
 - sincronizar com `POST /api/devices/:deviceId/heartbeat`
 - carregar horarios da resposta da API
 - salvar localmente a ultima configuracao e a ultima agenda valida
-- tocar buzzer nos horarios configurados
+- acionar o relé nos horários configurados
 - registrar evento quando um horario toca
 - mostrar menu no OLED
 - autenticar com `X-DEVICE-KEY`, nao mais com uma chave global compartilhada
@@ -415,9 +415,9 @@ OLED SSD1306 I2C:
 - `3V3` -> `VCC`
 - `G` -> `GND`
 
-Buzzer:
+Relé:
 
-- `D5` -> sinal do buzzer
+- `D5` -> sinal do relé
 
 LED interno do D1 mini:
 
@@ -446,8 +446,8 @@ Observacao:
 
 ## Observacoes
 
-- O firmware ainda esta com foco em buzzer + menu + agenda, sem sensor.
-- Se `Som local` estiver `OFF`, o firmware usa o LED interno no teste sonoro e nos horarios agendados em vez do buzzer.
+- O firmware ainda está com foco em relé + menu + agenda, sem sensor.
+- Se `Som local` estiver `OFF`, o firmware usa o LED interno no teste sonoro e nos horários agendados em vez do relé.
 - A placa entra em modo offline com a ultima agenda salva quando a API ou o Wi-Fi caem.
 - As tentativas de Wi-Fi/API continuam periodicas, mas ficam pausadas perto do proximo horario para priorizar o toque.
 - O painel atual cobre cadastro, edicao, ativacao, desativacao e exclusao de horarios. Se voce quiser, o proximo passo natural e adicionar uma pagina de eventos.

@@ -141,7 +141,7 @@ async function refreshSession(options = {}) {
     return true;
   } catch (error) {
     if (!options.silent) {
-      handleRequestFailure(error, "Nao foi possivel validar sua sessao.");
+      handleRequestFailure(error, "N\u00e3o foi poss\u00edvel validar sua sess\u00e3o.");
     }
     state.session = null;
     state.requiresPasswordChange = false;
@@ -156,7 +156,7 @@ async function login() {
 
   if (!identifier || !password) {
     setApiBadge("API: login incompleto", false);
-    setHint("Informe seu usuario e tambem a senha.");
+    setHint("Informe o nome da empresa e tamb\u00e9m a senha.");
     return;
   }
 
@@ -165,7 +165,7 @@ async function login() {
     const payload = await apiRequest("/api/client/session", {
       method: "POST",
       body: JSON.stringify({
-        user_id: identifier,
+        company_name: identifier,
         password,
       }),
     });
@@ -177,14 +177,14 @@ async function login() {
 
     if (state.requiresPasswordChange) {
       renderPasswordChangeRequiredState();
-      showFlash("Senha provisoria aceita. Troque a senha para liberar a agenda.", "success");
+      showFlash("Senha provis\u00f3ria aceita. Troque a senha para liberar a agenda.", "success");
       return;
     }
 
     await refreshEverything();
-    showFlash("Sessao iniciada com sucesso.", "success");
+    showFlash("Sess\u00e3o iniciada com sucesso.", "success");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel entrar com esta conta.");
+    handleRequestFailure(error, "N\u00e3o foi poss\u00edvel entrar com esta conta.");
   }
 }
 
@@ -218,12 +218,12 @@ async function handlePasswordChange(event) {
   const confirmPassword = elements.confirmPasswordInput.value.trim();
 
   if (!currentPassword || !newPassword || !confirmPassword) {
-    showFlash("Preencha a senha atual, a nova senha e a confirmacao.", "error");
+    showFlash("Preencha a senha atual, a nova senha e a confirma\u00e7\u00e3o.", "error");
     return;
   }
 
   if (newPassword !== confirmPassword) {
-    showFlash("A confirmacao da nova senha nao confere.", "error");
+    showFlash("A confirma\u00e7\u00e3o da nova senha n\u00e3o confere.", "error");
     return;
   }
 
@@ -244,7 +244,7 @@ async function handlePasswordChange(event) {
     await refreshEverything();
     showFlash("Senha atualizada. A agenda dos ESPs foi liberada.", "success");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel trocar a senha.");
+    handleRequestFailure(error, "N\u00e3o foi poss\u00edvel trocar a senha.");
   }
 }
 
@@ -277,7 +277,7 @@ async function refreshEverything() {
       renderSchedules([]);
       resetScheduleForm();
       setApiBadge("API: online", true);
-      setHint("Sua conta ainda nao tem ESPs vinculados.");
+      setHint("Sua conta ainda n\u00e3o tem ESPs vinculados.");
       return;
     }
 
@@ -289,9 +289,9 @@ async function refreshEverything() {
     renderDeviceCards();
     await loadSelectedDevice();
     setApiBadge("API: online", true);
-    setHint("Conta conectada. Escolha um ESP para editar os horarios.");
+    setHint("Conta conectada. Escolha um ESP para editar os hor\u00e1rios.");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel carregar seus ESPs.");
+    handleRequestFailure(error, "N\u00e3o foi poss\u00edvel carregar seus ESPs.");
   }
 }
 
@@ -304,16 +304,16 @@ function renderPasswordChangeRequiredState() {
   renderDeviceSummary(null);
   renderSchedules([]);
   resetScheduleForm();
-  elements.selectedDeviceHeading.textContent = "Troque a senha provisoria";
-  elements.selectedDeviceContext.textContent = "Assim que a nova senha for salva, os ESPs da sua conta serao liberados aqui.";
+  elements.selectedDeviceHeading.textContent = "Troque a senha provis\u00f3ria";
+  elements.selectedDeviceContext.textContent = "Assim que a nova senha for salva, os ESPs da sua conta ser\u00e3o liberados aqui.";
   elements.deviceStatusText.textContent = "Troca de senha pendente";
   elements.deviceCardList.innerHTML =
-    '<div class="empty-state">Troque a senha provisoria para liberar os ESPs da sua conta.</div>';
+    '<div class="empty-state">Troque a senha provis&oacute;ria para liberar os ESPs da sua conta.</div>';
   elements.deviceSelect.innerHTML = '<option value="">Troque a senha primeiro</option>';
-  elements.scheduleCountNote.textContent = "Agenda bloqueada ate a troca da senha.";
+  elements.scheduleCountNote.textContent = "Agenda bloqueada at\u00e9 a troca da senha.";
   elements.scheduleList.innerHTML =
-    '<div class="empty-state">Depois de trocar a senha provisoria, os horarios de cada ESP aparecem aqui.</div>';
-  setApiBadge("API: senha provisoria", true);
+    '<div class="empty-state">Depois de trocar a senha provis&oacute;ria, os hor&aacute;rios de cada ESP aparecem aqui.</div>';
+  setApiBadge("API: senha provis\u00f3ria", true);
   setHint("Defina uma nova senha para continuar.");
 }
 
@@ -327,10 +327,10 @@ function renderLoggedOutState() {
   resetScheduleForm();
   elements.deviceStatusText.textContent = "Aguardando login";
   elements.deviceCardList.innerHTML =
-    '<div class="empty-state">Entre com sua conta para ver os ESPs liberados para voce.</div>';
+    '<div class="empty-state">Entre com sua conta para ver os ESPs liberados para voc&ecirc;.</div>';
   elements.deviceSelect.innerHTML = '<option value="">Entre para ver</option>';
   setApiBadge("API: aguardando login", false);
-  setHint("Entre com seu usuario para listar os ESPs vinculados a sua conta.");
+  setHint("Entre com o nome da empresa para listar os ESPs vinculados a sua conta.");
   hideFlash();
 }
 
@@ -351,14 +351,14 @@ function updateSessionUi() {
   );
   elements.sessionBadge.textContent = isLoggedIn
     ? state.requiresPasswordChange
-      ? "Sessao: troca pendente"
-      : "Sessao: ativa"
-    : "Sessao: fechada";
+      ? "Sess\u00e3o: troca pendente"
+      : "Sess\u00e3o: ativa"
+    : "Sess\u00e3o: fechada";
   elements.sessionBadge.classList.toggle("badge-offline", !isLoggedIn || state.requiresPasswordChange);
 
   if (!isLoggedIn) {
     elements.sessionCompanyName.textContent = "Conta desconectada";
-    elements.sessionMeta.textContent = "Entre para editar os horarios dos seus ESPs.";
+    elements.sessionMeta.textContent = "Entre para editar os hor\u00e1rios dos seus ESPs.";
     elements.accountCompany.textContent = "--";
     elements.accountUserId.textContent = "--";
     elements.accountAccess.textContent = "--";
@@ -368,11 +368,11 @@ function updateSessionUi() {
 
   elements.sessionCompanyName.textContent = state.session.company_name || state.session.user_id || "Conta conectada";
   elements.sessionMeta.textContent = state.requiresPasswordChange
-    ? "Sua conta entrou com senha provisoria. Troque a senha para liberar os ESPs."
-    : `${state.session.user_id} pronto para gerenciar os horarios dos ESPs.`;
+    ? "Sua conta entrou com senha provis\u00f3ria. Troque a senha para liberar os ESPs."
+    : `${state.session.company_name || "Conta"} pronta para gerenciar os hor\u00e1rios dos ESPs.`;
   elements.accountCompany.textContent = state.session.company_name || "--";
-  elements.accountUserId.textContent = state.session.user_id || "--";
-  elements.accountAccess.textContent = state.requiresPasswordChange ? "Senha provisoria" : "Senha definitiva";
+  elements.accountUserId.textContent = state.session.company_name || "--";
+  elements.accountAccess.textContent = state.requiresPasswordChange ? "Senha provis\u00f3ria" : "Senha definitiva";
   elements.accountDeviceCount.textContent = String(Array.isArray(state.session.devices) ? state.session.devices.length : state.devices.length);
 
   if (state.requiresPasswordChange) {
@@ -467,9 +467,9 @@ async function loadSelectedDevice() {
 
     renderDeviceSummary(device);
     renderSchedules(schedules);
-    elements.deviceStatusText.textContent = device ? `ESP ativo: ${device.device_id}` : "ESP nao encontrado";
+    elements.deviceStatusText.textContent = device ? `ESP ativo: ${device.device_id}` : "ESP n\u00e3o encontrado";
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel carregar o ESP selecionado.");
+    handleRequestFailure(error, "N\u00e3o foi poss\u00edvel carregar o ESP selecionado.");
   }
 }
 
@@ -477,12 +477,12 @@ async function handleScheduleSave(event) {
   event.preventDefault();
 
   if (state.requiresPasswordChange) {
-    showFlash("Troque a senha provisoria antes de editar horarios.", "error");
+    showFlash("Troque a senha provis\u00f3ria antes de editar hor\u00e1rios.", "error");
     return;
   }
 
   if (!state.selectedDeviceId) {
-    showFlash("Selecione um ESP antes de cadastrar horarios.", "error");
+    showFlash("Selecione um ESP antes de cadastrar hor\u00e1rios.", "error");
     return;
   }
 
@@ -506,13 +506,13 @@ async function handleScheduleSave(event) {
     };
 
     if (state.editingScheduleId === null) {
-      setLoadingState("Criando horario...");
+      setLoadingState("Criando hor\u00e1rio...");
       await apiRequest(`/api/client/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
     } else {
-      setLoadingState("Atualizando horario...");
+      setLoadingState("Atualizando hor\u00e1rio...");
       await apiRequest(
         `/api/client/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(state.editingScheduleId)}`,
         {
@@ -525,8 +525,8 @@ async function handleScheduleSave(event) {
     await loadSelectedDevice();
     const successMessage =
       state.editingScheduleId === null
-        ? `Horario ${payload.label} cadastrado com sucesso.`
-        : `Horario ${payload.label} atualizado com sucesso.`;
+        ? `Hor\u00e1rio ${payload.label} cadastrado com sucesso.`
+        : `Hor\u00e1rio ${payload.label} atualizado com sucesso.`;
     resetScheduleForm();
     closeScheduleModal();
     showFlash(successMessage, "success");
@@ -534,15 +534,15 @@ async function handleScheduleSave(event) {
     handleRequestFailure(
       error,
       state.editingScheduleId === null
-        ? "Nao foi possivel cadastrar o horario."
-        : "Nao foi possivel atualizar o horario."
+        ? "N\u00e3o foi poss\u00edvel cadastrar o hor\u00e1rio."
+        : "N\u00e3o foi poss\u00edvel atualizar o hor\u00e1rio."
     );
   }
 }
 
 async function handleScheduleListClick(event) {
   if (state.requiresPasswordChange) {
-    showFlash("Troque a senha provisoria antes de editar horarios.", "error");
+    showFlash("Troque a senha provis\u00f3ria antes de editar hor\u00e1rios.", "error");
     return;
   }
 
@@ -554,7 +554,7 @@ async function handleScheduleListClick(event) {
   const scheduleId = button.getAttribute("data-schedule-id");
   const action = button.getAttribute("data-action");
   const schedule = findScheduleById(scheduleId);
-  const scheduleLabel = schedule?.label || button.getAttribute("data-schedule-label") || "este horario";
+  const scheduleLabel = schedule?.label || button.getAttribute("data-schedule-label") || "este hor\u00e1rio";
 
   if (!scheduleId || !schedule) {
     return;
@@ -586,7 +586,7 @@ async function handleScheduleListClick(event) {
   }
 
   try {
-    setLoadingState("Apagando horario...");
+    setLoadingState("Apagando hor\u00e1rio...");
     await apiRequest(
       `/api/client/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(scheduleId)}`,
       {
@@ -596,9 +596,9 @@ async function handleScheduleListClick(event) {
 
     state.pendingDeleteScheduleId = null;
     await loadSelectedDevice();
-    showFlash(`Horario ${scheduleLabel} removido.`, "success");
+    showFlash(`Hor\u00e1rio ${scheduleLabel} removido.`, "success");
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel apagar o horario.");
+    handleRequestFailure(error, "N\u00e3o foi poss\u00edvel apagar o hor\u00e1rio.");
   }
 }
 
@@ -612,7 +612,7 @@ async function handleScheduleToggle(schedule) {
       elements.enabledInput.checked = nextEnabled;
     }
 
-    setLoadingState(nextEnabled ? "Ativando horario..." : "Desativando horario...");
+    setLoadingState(nextEnabled ? "Ativando hor\u00e1rio..." : "Desativando hor\u00e1rio...");
     await apiRequest(
       `/api/client/devices/${encodeURIComponent(state.selectedDeviceId)}/schedules/${encodeURIComponent(schedule.id)}/enabled`,
       {
@@ -624,12 +624,12 @@ async function handleScheduleToggle(schedule) {
     await loadSelectedDevice();
     showFlash(
       nextEnabled
-        ? `Horario ${schedule.label} ativado.`
-        : `Horario ${schedule.label} desativado.`,
+        ? `Hor\u00e1rio ${schedule.label} ativado.`
+        : `Hor\u00e1rio ${schedule.label} desativado.`,
       "success"
     );
   } catch (error) {
-    handleRequestFailure(error, "Nao foi possivel alterar o estado do horario.");
+    handleRequestFailure(error, "N\u00e3o foi poss\u00edvel alterar o estado do hor\u00e1rio.");
   }
 }
 
@@ -653,7 +653,7 @@ function renderDeviceOptions() {
 function renderDeviceCards() {
   if (!state.devices.length) {
     elements.deviceCardList.innerHTML =
-      '<div class="empty-state">Sua conta ainda nao tem ESPs vinculados.</div>';
+      '<div class="empty-state">Sua conta ainda n&atilde;o tem ESPs vinculados.</div>';
     return;
   }
 
@@ -715,7 +715,7 @@ function renderDeviceCards() {
 function renderDeviceSummary(device) {
   if (!device) {
     elements.selectedDeviceHeading.textContent = "Selecione um ESP";
-    elements.selectedDeviceContext.textContent = "Escolha um ESP da lista para ver somente os horarios dele.";
+    elements.selectedDeviceContext.textContent = "Escolha um ESP da lista para ver somente os hor\u00e1rios dele.";
     elements.summaryConnectionStatus.textContent = "--";
     elements.summaryTotalSchedules.textContent = "--";
     elements.summaryActiveSchedules.textContent = "--";
@@ -738,7 +738,7 @@ function renderDeviceSummary(device) {
   const connectionStatus = inferDeviceOnline(device) ? "Online" : "Offline";
 
   elements.selectedDeviceHeading.textContent = device.menu_title || device.name || device.device_id;
-  elements.selectedDeviceContext.textContent = `${device.device_id} selecionado. Os horarios abaixo pertencem somente a ele.`;
+  elements.selectedDeviceContext.textContent = `${device.device_id} selecionado. Os hor\u00e1rios abaixo pertencem somente a ele.`;
   elements.summaryConnectionStatus.textContent = connectionStatus;
   elements.summaryTotalSchedules.textContent = String(totalSchedules);
   elements.summaryActiveSchedules.textContent = String(activeScheduleCount);
@@ -757,8 +757,8 @@ function renderSchedules(schedules) {
   state.schedules = schedules;
   const deviceLabel = state.selectedDeviceId || "este ESP";
   elements.scheduleCountNote.textContent = schedules.length
-    ? `${schedules.length} horario(s) neste ESP.`
-    : `Nenhum horario cadastrado para ${deviceLabel}.`;
+    ? `${schedules.length} hor\u00e1rio(s) neste ESP.`
+    : `Nenhum hor\u00e1rio cadastrado para ${deviceLabel}.`;
 
   if (
     state.pendingDeleteScheduleId &&
@@ -775,7 +775,7 @@ function renderSchedules(schedules) {
   }
 
   if (!schedules.length) {
-    elements.scheduleList.innerHTML = '<div class="empty-state">Ainda nao existe horario para este ESP.</div>';
+    elements.scheduleList.innerHTML = '<div class="empty-state">Ainda n&atilde;o existe hor&aacute;rio para este ESP.</div>';
     return;
   }
 
@@ -893,13 +893,13 @@ function syncScheduleEditorUi(schedule = null) {
   const currentSchedule = schedule || findScheduleById(state.editingScheduleId);
   const deviceLabel = state.selectedDeviceId || "ESP selecionado";
 
-  elements.scheduleFormKicker.textContent = isEditing ? "Editar horario" : "Novo horario";
-  elements.scheduleFormTitle.textContent = isEditing ? "Editar horario" : "Cadastrar horario";
+  elements.scheduleFormKicker.textContent = isEditing ? "Editar hor\u00e1rio" : "Novo hor\u00e1rio";
+  elements.scheduleFormTitle.textContent = isEditing ? "Editar hor\u00e1rio" : "Cadastrar hor\u00e1rio";
   elements.scheduleFormContext.textContent = isEditing
-    ? `Atualize o horario selecionado para o ESP ${deviceLabel}.`
+    ? `Atualize o hor\u00e1rio selecionado para o ESP ${deviceLabel}.`
     : `Preencha os dados do novo toque para o ESP ${deviceLabel}.`;
-  elements.saveScheduleButton.textContent = isEditing ? "Salvar alteracoes" : "Cadastrar horario";
-  elements.resetScheduleButton.textContent = isEditing ? "Cancelar edicao" : "Fechar";
+  elements.saveScheduleButton.textContent = isEditing ? "Salvar altera\u00e7\u00f5es" : "Cadastrar hor\u00e1rio";
+  elements.resetScheduleButton.textContent = isEditing ? "Cancelar edi\u00e7\u00e3o" : "Fechar";
   elements.scheduleEditorBadge.textContent = isEditing
     ? `Editando #${currentSchedule?.id ?? state.editingScheduleId}`
     : "Criando";
@@ -922,12 +922,12 @@ function switchWorkspaceTab(nextTab) {
 
 function handleOpenScheduleModal() {
   if (state.requiresPasswordChange) {
-    showFlash("Troque a senha provisoria antes de editar horarios.", "error");
+    showFlash("Troque a senha provis\u00f3ria antes de editar hor\u00e1rios.", "error");
     return;
   }
 
   if (!state.selectedDeviceId) {
-    showFlash("Selecione um ESP antes de cadastrar horarios.", "error");
+    showFlash("Selecione um ESP antes de cadastrar hor\u00e1rios.", "error");
     return;
   }
 
@@ -1016,7 +1016,7 @@ function handleRequestFailure(error, fallbackMessage) {
     state.session = null;
     state.requiresPasswordChange = false;
     renderLoggedOutState();
-    showFlash("Sua sessao expirou. Entre novamente.", "error");
+    showFlash("Sua sess\u00e3o expirou. Entre novamente.", "error");
     return;
   }
 
@@ -1024,13 +1024,13 @@ function handleRequestFailure(error, fallbackMessage) {
     state.requiresPasswordChange = true;
     updateSessionUi();
     renderPasswordChangeRequiredState();
-    showFlash(error.message || "Troque a senha provisoria para continuar.", "error");
+    showFlash(error.message || "Troque a senha provis\u00f3ria para continuar.", "error");
     return;
   }
 
   const message = error?.message || fallbackMessage;
   setApiBadge("API: erro", false);
-  elements.deviceStatusText.textContent = "Falha de comunicacao";
+  elements.deviceStatusText.textContent = "Falha de comunica\u00e7\u00e3o";
   setHint(message);
   showFlash(message, "error");
 }

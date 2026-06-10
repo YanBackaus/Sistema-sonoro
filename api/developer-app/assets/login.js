@@ -44,13 +44,13 @@ async function handleSubmit(event) {
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      hint.textContent = payload?.error || "Nao foi possivel entrar.";
+      hint.textContent = payload?.error || "N\u00e3o foi poss\u00edvel entrar.";
       return;
     }
 
     window.location.replace("/developer");
   } catch (error) {
     console.error(error);
-    hint.textContent = "Falha de conexao com a API.";
+    hint.textContent = "Falha de conex\u00e3o com a API.";
   }
 }

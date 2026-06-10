@@ -47,9 +47,19 @@ static const time_t MIN_VALID_UNIX_TIME = 1700000000;
 
 #if defined(ESP8266)
 static const char* BOARD_NAME = "LOLIN D1 mini";
+// Pinagem assumida conforme a montagem da imagem:
+// OLED I2C -> D1 (SCL) / D2 (SDA)
+// Relé -> D5
+// Encoder -> D6 (DT) / D7 (CLK) / D3 (SW)
 static const uint8_t OLED_SCL_PIN = D1;
+// Confirmacao em ASCII:
+// Rele -> D5
+// OLED -> D1/D2
+// Encoder -> D6 (A/CLK), D7 (B/DT), D3 (SW)
 static const uint8_t OLED_SDA_PIN = D2;
-static const uint8_t BUZZER_PIN = D5;
+static const uint8_t RELAY_PIN = D5;
+// Se o modulo estiver em low-level trigger, troque para false.
+static const bool RELAY_ACTIVE_HIGH = true;
 static const uint8_t ALERT_LED_PIN = LED_BUILTIN;
 static const bool ALERT_LED_ACTIVE_LOW = true;
 static const uint8_t ENC_A_PIN = D6;
@@ -59,7 +69,9 @@ static const uint8_t ENC_SW_PIN = D3;
 static const char* BOARD_NAME = "ESP32";
 static const uint8_t OLED_SCL_PIN = 22;
 static const uint8_t OLED_SDA_PIN = 21;
-static const uint8_t BUZZER_PIN = 25;
+static const uint8_t RELAY_PIN = 25;
+// Se o modulo estiver em low-level trigger, troque para false.
+static const bool RELAY_ACTIVE_HIGH = true;
 static const uint8_t ALERT_LED_PIN = 2;
 static const bool ALERT_LED_ACTIVE_LOW = false;
 static const uint8_t ENC_A_PIN = 32;
@@ -78,7 +90,7 @@ enum UiState {
 
 enum AlertOutputMode {
   ALERT_OUTPUT_NONE,
-  ALERT_OUTPUT_BUZZER,
+  ALERT_OUTPUT_RELAY,
   ALERT_OUTPUT_LED
 };
 
@@ -221,11 +233,12 @@ void setup() {
     clearSchedule(index);
   }
 
-  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
   pinMode(ALERT_LED_PIN, OUTPUT);
   pinMode(ENC_A_PIN, INPUT_PULLUP);
   pinMode(ENC_B_PIN, INPUT_PULLUP);
   pinMode(ENC_SW_PIN, INPUT_PULLUP);
+  setRelayOutput(false);
   setAlertLed(false);
 
   EEPROM.begin(EEPROM_SIZE);
@@ -793,10 +806,10 @@ void playTestTone() {
   strcpy(sample.label, "Teste");
 
   AlertOutputMode outputMode = playAlertPattern(sample, true);
-  lastSyncMessage = outputMode == ALERT_OUTPUT_LED ? "Teste no LED" : "Teste no buzzer";
+  lastSyncMessage = outputMode == ALERT_OUTPUT_LED ? "Teste no LED" : "Teste no rele";
   sendEvent(
     "manual_test",
-    outputMode == ALERT_OUTPUT_LED ? "Teste manual no LED interno" : "Teste manual do buzzer",
+    outputMode == ALERT_OUTPUT_LED ? "Teste manual no LED interno" : "Teste manual do rele",
     0
   );
 }
@@ -1201,21 +1214,21 @@ AlertOutputMode playAlertPattern(const DeviceSchedule& schedule, bool ignoreApiS
   }
 
   if (localSettings.soundEnabled == 1) {
-    playBuzzerPattern(schedule);
-    return ALERT_OUTPUT_BUZZER;
+    playRelayPattern(schedule);
+    return ALERT_OUTPUT_RELAY;
   }
 
   playLedPattern(schedule);
   return ALERT_OUTPUT_LED;
 }
 
-void playBuzzerPattern(const DeviceSchedule& schedule) {
+void playRelayPattern(const DeviceSchedule& schedule) {
   setAlertLed(false);
 
   for (int repeatIndex = 0; repeatIndex < schedule.repeatCount; repeatIndex++) {
-    tone(BUZZER_PIN, schedule.toneHz);
+    setRelayOutput(true);
     delay(schedule.toneMs);
-    noTone(BUZZER_PIN);
+    setRelayOutput(false);
 
     if (repeatIndex + 1 < schedule.repeatCount) {
       delay(schedule.repeatGapMs);
@@ -1224,7 +1237,7 @@ void playBuzzerPattern(const DeviceSchedule& schedule) {
 }
 
 void playLedPattern(const DeviceSchedule& schedule) {
-  noTone(BUZZER_PIN);
+  setRelayOutput(false);
 
   for (int repeatIndex = 0; repeatIndex < schedule.repeatCount; repeatIndex++) {
     setAlertLed(true);
@@ -1235,6 +1248,10 @@ void playLedPattern(const DeviceSchedule& schedule) {
       delay(schedule.repeatGapMs);
     }
   }
+}
+
+void setRelayOutput(bool enabled) {
+  digitalWrite(RELAY_PIN, enabled == RELAY_ACTIVE_HIGH ? HIGH : LOW);
 }
 
 void setAlertLed(bool enabled) {

@@ -8,7 +8,8 @@ const {
   createDatabasePool,
   deleteClientUserById,
   deleteDeviceById,
-  getClientUserAuthRecordByIdentifier,
+  getClientUserAuthRecordByCompanyName,
+  getClientUserAuthRecordByUserId,
   getClientUserById,
   getClientUserDetails,
   getDeveloperDeviceDetails,
@@ -230,8 +231,8 @@ app.get("/api/developer/overview", requireDeveloperSession, async (request, resp
 
 app.post("/api/client/session", async (request, response) => {
   try {
-    const { user_id, password } = normalizeClientSessionPayload(request.body || {});
-    const authRecord = await getClientUserAuthRecordByIdentifier(pool, user_id);
+    const { company_name, password } = normalizeClientSessionPayload(request.body || {});
+    const authRecord = await getClientUserAuthRecordByCompanyName(pool, company_name);
     const isAuthorized =
       authRecord &&
       authRecord.status === "active" &&
@@ -282,7 +283,7 @@ app.get("/api/client/session", requireClientSession, async (request, response) =
 app.put("/api/client/session/password", requireClientSession, async (request, response) => {
   try {
     const { current_password, new_password } = normalizeClientPasswordChangePayload(request.body || {});
-    const authRecord = await getClientUserAuthRecordByIdentifier(pool, request.clientSession.user_id);
+    const authRecord = await getClientUserAuthRecordByUserId(pool, request.clientSession.user_id);
 
     if (!authRecord || authRecord.status !== "active") {
       response.status(404).json({

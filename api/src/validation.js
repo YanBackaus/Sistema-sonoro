@@ -29,13 +29,14 @@ function normalizeUserId(value, fieldName = "user_id") {
 function normalizeDevicePayload(payload, defaults) {
   const device_id = normalizeDeviceId(payload.device_id);
   const name = normalizeString(payload.name, 80) || device_id;
+  const location = normalizeString(payload.location, 120);
 
   return {
     device_id,
     owner_user_id: normalizeOptionalUserId(payload.owner_user_id),
     name,
-    location: normalizeString(payload.location, 120),
-    menu_title: normalizeString(payload.menu_title, 80) || name,
+    location,
+    menu_title: location || name,
     hardware_model: normalizeString(payload.hardware_model, 64) || "lolin_d1_mini",
     firmware_profile: normalizeString(payload.firmware_profile, 80) || device_id,
     sound_enabled: normalizeBoolean(payload.sound_enabled, true),
@@ -67,7 +68,7 @@ function normalizeUserPayload(payload) {
   return {
     user_id,
     company_name,
-    contact_name: normalizeString(payload.contact_name, 80),
+    contact_name: null,
     email: normalizeOptionalEmail(payload.email),
     password: normalizeOptionalPassword(payload.password),
     rotate_password: normalizeBoolean(payload.rotate_password, false),
@@ -134,14 +135,21 @@ function normalizeDeveloperPasswordPayload(payload) {
 }
 
 function normalizeClientSessionPayload(payload) {
-  const user_id = normalizeUserId(payload.user_id ?? payload.identifier, "user_id");
+  const company_name = normalizeString(
+    payload.company_name ?? payload.identifier ?? payload.user_id,
+    120
+  );
   const password = normalizeString(payload.password, 256);
+
+  if (!company_name) {
+    throw new ValidationError("company_name is required.");
+  }
 
   if (!password) {
     throw new ValidationError("password is required.");
   }
 
-  return { user_id, password };
+  return { company_name, password };
 }
 
 function normalizeClientPasswordChangePayload(payload) {

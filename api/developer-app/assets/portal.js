@@ -16,7 +16,6 @@ const elements = {
   userForm: document.querySelector("#developerUserForm"),
   userIdInput: document.querySelector("#developerUserIdInput"),
   userCompanyInput: document.querySelector("#developerUserCompanyInput"),
-  userContactInput: document.querySelector("#developerUserContactInput"),
   userPasswordInput: document.querySelector("#developerUserPasswordInput"),
   userRotatePasswordInput: document.querySelector("#developerUserRotatePasswordInput"),
   userStatusInput: document.querySelector("#developerUserStatusInput"),
@@ -130,6 +129,7 @@ function bindEvents() {
   elements.userDeleteButton.addEventListener("click", deleteSelectedUser);
 
   elements.deviceForm.addEventListener("submit", submitDeviceForm);
+  elements.deviceLocationInput.addEventListener("input", syncDeviceMenuFromLocation);
   elements.generateRecoveryKeyButton.addEventListener("click", generateRecoveryKeyForSelectedDevice);
   elements.deviceResetButton.addEventListener("click", resetDeviceForm);
   elements.deviceDeleteButton.addEventListener("click", deleteSelectedDevice);
@@ -147,8 +147,8 @@ async function ensureSession() {
   const expiresAt = payload.expires_at ? new Date(payload.expires_at) : null;
   elements.sessionChip.textContent =
     expiresAt && !Number.isNaN(expiresAt.getTime())
-      ? `Sessao ate ${formatDateTime(expiresAt)}`
-      : "Sessao ativa";
+      ? `Sess\u00e3o at\u00e9 ${formatDateTime(expiresAt)}`
+      : "Sess\u00e3o ativa";
 }
 
 async function refreshOverview(successMessage = "") {
@@ -211,7 +211,7 @@ async function refreshOverview(successMessage = "") {
     renderBuildPlan();
     setBanner(successMessage || "Portal pronto.", "success");
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel carregar o portal.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel carregar o portal.");
   }
 }
 
@@ -238,7 +238,7 @@ function updateTabUi() {
 
 function renderUserList() {
   if (!state.users.length) {
-    elements.userList.innerHTML = '<div class="empty-state">Nenhum usuario cadastrado.</div>';
+    elements.userList.innerHTML = '<div class="empty-state">Nenhum usu&aacute;rio cadastrado.</div>';
     return;
   }
 
@@ -258,7 +258,6 @@ function renderUserList() {
           </div>
           <div class="developer-card-bottom">
             <span class="developer-badge">${Number(user.device_count || 0)} ESP(s)</span>
-            ${user.contact_name ? `<span class="developer-badge">${escapeHtml(user.contact_name)}</span>` : ""}
             ${user.password_temporary ? '<span class="developer-badge developer-badge-warning">Troca pendente</span>' : ""}
           </div>
         </button>
@@ -290,10 +289,10 @@ async function loadUserDetails(userId, options = {}) {
     syncUserProvisioningCard();
 
     if (!options.silent) {
-      setBanner(`Usuario ${payload.user.user_id} carregado.`, "success");
+      setBanner(`Usu\u00e1rio ${payload.user.user_id} carregado.`, "success");
     }
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel abrir o usuario.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel abrir o usu\u00e1rio.");
   }
 }
 
@@ -302,7 +301,6 @@ function fillUserForm(user) {
   elements.userIdInput.value = user.user_id || "";
   elements.userIdInput.readOnly = true;
   elements.userCompanyInput.value = user.company_name || "";
-  elements.userContactInput.value = user.contact_name || "";
   elements.userPasswordInput.value = "";
   elements.userRotatePasswordInput.checked = false;
   elements.userStatusInput.value = user.status || "active";
@@ -310,7 +308,7 @@ function fillUserForm(user) {
 }
 
 function applyBlankUserForm() {
-  elements.userTitle.textContent = "Novo usuario";
+  elements.userTitle.textContent = "Novo usu\u00e1rio";
   elements.userForm.reset();
   elements.userIdInput.readOnly = false;
   elements.userStatusInput.value = "active";
@@ -332,13 +330,12 @@ async function submitUserForm(event) {
   const payload = {
     user_id: elements.userIdInput.value.trim(),
     company_name: elements.userCompanyInput.value.trim(),
-    contact_name: elements.userContactInput.value.trim(),
     password: elements.userPasswordInput.value.trim(),
     rotate_password: elements.userRotatePasswordInput.checked,
     status: elements.userStatusInput.value,
   };
 
-  setBanner("Salvando usuario...", "");
+  setBanner("Salvando usu\u00e1rio...", "");
 
   try {
     const response = await fetchJson("/api/developer/users", {
@@ -355,20 +352,20 @@ async function submitUserForm(event) {
         }
       : null;
 
-    await refreshOverview(`Usuario ${response.user.user_id} salvo.`);
+    await refreshOverview(`Usu\u00e1rio ${response.user.user_id} salvo.`);
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel salvar o usuario.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel salvar o usu\u00e1rio.");
   }
 }
 
 async function deleteSelectedUser() {
   const userId = state.selectedUserId;
   if (!userId) {
-    setBanner("Escolha um usuario antes de excluir.", "error");
+    setBanner("Escolha um usu\u00e1rio antes de excluir.", "error");
     return;
   }
 
-  const confirmed = window.confirm(`Excluir o usuario ${userId}? Os ESPs ficam sem dono, mas continuam cadastrados.`);
+  const confirmed = window.confirm(`Excluir o usu\u00e1rio ${userId}? Os ESPs ficam sem dono, mas continuam cadastrados.`);
   if (!confirmed) {
     return;
   }
@@ -382,16 +379,16 @@ async function deleteSelectedUser() {
 
     state.userProvisioning = null;
     resetUserForm();
-    await refreshOverview(`Usuario ${userId} excluido.`);
+    await refreshOverview(`Usu\u00e1rio ${userId} exclu\u00eddo.`);
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel excluir o usuario.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel excluir o usu\u00e1rio.");
   }
 }
 
 function renderUserSummary(user) {
   if (!user) {
     elements.userSummary.innerHTML = `
-      <strong>Nenhum usuario selecionado</strong>
+      <strong>Nenhum usu&aacute;rio selecionado</strong>
       <p>Escolha um cliente para ver os ESPs vinculados e o status da conta.</p>
     `;
     return;
@@ -407,9 +404,8 @@ function renderUserSummary(user) {
     <strong>${escapeHtml(user.company_name || user.user_id)}</strong>
     <div class="developer-summary-list">
       <div class="developer-summary-line"><span>ID</span><strong>${escapeHtml(user.user_id)}</strong></div>
-      <div class="developer-summary-line"><span>Acesso</span><strong>${user.password_temporary ? "Senha provisoria" : "Senha definitiva"}</strong></div>
+      <div class="developer-summary-line"><span>Acesso</span><strong>${user.password_temporary ? "Senha provis&oacute;ria" : "Senha definitiva"}</strong></div>
       <div class="developer-summary-line"><span>Status</span><strong>${user.status === "active" ? "Ativo" : "Pausado"}</strong></div>
-      <div class="developer-summary-line"><span>Contato</span><strong>${escapeHtml(user.contact_name || "--")}</strong></div>
     </div>
     <div class="developer-meta-grid">${deviceBadges}</div>
   `;
@@ -418,7 +414,7 @@ function renderUserSummary(user) {
 function renderUserOptions() {
   const ownerValue = elements.deviceOwnerInput.value;
   const targetUserValue = elements.releaseTargetUserInput.value;
-  const options = ['<option value="">Sem usuario</option>'];
+  const options = ['<option value="">Sem usu&aacute;rio</option>'];
 
   for (const user of state.users) {
     options.push(
@@ -431,7 +427,7 @@ function renderUserOptions() {
     elements.deviceOwnerInput.value = ownerValue;
   }
 
-  const targetOptions = ['<option value="">Selecione um usuario</option>'];
+  const targetOptions = ['<option value="">Selecione um usu&aacute;rio</option>'];
   for (const user of state.users) {
     targetOptions.push(
       `<option value="${escapeHtml(user.user_id)}">${escapeHtml(buildUserLabel(user))}</option>`
@@ -453,7 +449,7 @@ function renderDeviceList() {
     .map((device) => {
       const isActive = device.device_id === state.selectedDeviceId;
       const online = inferDeviceOnline(device);
-      const ownerLabel = device.owner_company_name || "Sem usuario";
+      const ownerLabel = device.owner_company_name || "Sem usu\u00e1rio";
       const latestDeployment = device.latest_deployment;
       const deploymentLabel = latestDeployment
         ? `${statusLabel(latestDeployment.status)} ${escapeHtml(latestDeployment.release.version)}`
@@ -547,7 +543,7 @@ async function loadDeviceDetails(deviceId, options = {}) {
       setBanner(`ESP selecionado: ${payload.device.device_id}.`, "success");
     }
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel abrir o ESP.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel abrir o ESP.");
   }
 }
 
@@ -558,7 +554,7 @@ function fillDeviceForm(device) {
   elements.deviceNameInput.value = device.name || "";
   elements.deviceOwnerInput.value = device.owner_user_id || "";
   elements.deviceLocationInput.value = device.location || "";
-  elements.deviceMenuInput.value = device.menu_title || "";
+  elements.deviceMenuInput.value = device.location || device.menu_title || "";
   elements.deviceHardwareModelInput.value = device.hardware_model || "lolin_d1_mini";
   elements.deviceFirmwareProfileInput.value = device.firmware_profile || device.device_id;
   elements.devicePollInput.value = String(device.poll_interval_seconds ?? 60);
@@ -575,6 +571,7 @@ function applyBlankDeviceForm() {
   elements.deviceForm.reset();
   elements.deviceIdInput.readOnly = false;
   elements.deviceOwnerInput.value = "";
+  elements.deviceMenuInput.value = "";
   elements.deviceHardwareModelInput.value = "lolin_d1_mini";
   elements.deviceFirmwareProfileInput.value = "";
   elements.devicePollInput.value = "60";
@@ -597,13 +594,14 @@ function resetDeviceForm() {
 
 async function submitDeviceForm(event) {
   event.preventDefault();
+  syncDeviceMenuFromLocation();
 
   const payload = {
     device_id: elements.deviceIdInput.value.trim(),
     owner_user_id: elements.deviceOwnerInput.value,
     name: elements.deviceNameInput.value.trim(),
     location: elements.deviceLocationInput.value.trim(),
-    menu_title: elements.deviceMenuInput.value.trim(),
+    menu_title: elements.deviceLocationInput.value.trim(),
     hardware_model: elements.deviceHardwareModelInput.value.trim(),
     firmware_profile: elements.deviceFirmwareProfileInput.value.trim(),
     utc_offset_minutes: Number.parseInt(elements.deviceUtcOffsetInput.value, 10),
@@ -632,8 +630,12 @@ async function submitDeviceForm(event) {
 
     await refreshOverview(`ESP ${response.device.device_id} salvo.`);
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel salvar o ESP.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel salvar o ESP.");
   }
+}
+
+function syncDeviceMenuFromLocation() {
+  elements.deviceMenuInput.value = elements.deviceLocationInput.value.trim();
 }
 
 async function generateRecoveryKeyForSelectedDevice() {
@@ -661,7 +663,7 @@ async function generateRecoveryKeyForSelectedDevice() {
 
     await refreshOverview(`Chave em espera gerada para ${response.device.device_id}.`);
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel gerar a chave em espera.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel gerar a chave em espera.");
   }
 }
 
@@ -672,7 +674,7 @@ async function deleteSelectedDevice() {
     return;
   }
 
-  const confirmed = window.confirm(`Excluir o ESP ${deviceId}? Isso remove horarios e historico de deploy ligados a ele.`);
+  const confirmed = window.confirm(`Excluir o ESP ${deviceId}? Isso remove hor\u00e1rios e hist\u00f3rico de deploy ligados a ele.`);
   if (!confirmed) {
     return;
   }
@@ -686,9 +688,9 @@ async function deleteSelectedDevice() {
 
     state.deviceProvisioning = null;
     resetDeviceForm();
-    await refreshOverview(`ESP ${deviceId} excluido.`);
+    await refreshOverview(`ESP ${deviceId} exclu\u00eddo.`);
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel excluir o ESP.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel excluir o ESP.");
   }
 }
 
@@ -696,7 +698,7 @@ function renderDeviceSummary(device) {
   if (!device) {
     elements.deviceSummary.innerHTML = `
       <strong>Nenhum ESP selecionado</strong>
-      <p>Escolha um dispositivo para ver dono, versao atual e deploys recentes.</p>
+      <p>Escolha um dispositivo para ver dono, vers&atilde;o atual e deploys recentes.</p>
     `;
     return;
   }
@@ -710,12 +712,12 @@ function renderDeviceSummary(device) {
     <div class="developer-summary-selection">${renderSelectionIndicator("ESP selecionado")}</div>
     <div class="developer-summary-list">
       <div class="developer-summary-line"><span>ID</span><strong>${escapeHtml(device.device_id)}</strong></div>
-      <div class="developer-summary-line"><span>Usuario</span><strong>${escapeHtml(device.owner_company_name || "Sem usuario")}</strong></div>
+      <div class="developer-summary-line"><span>Usu&aacute;rio</span><strong>${escapeHtml(device.owner_company_name || "Sem usu&aacute;rio")}</strong></div>
       <div class="developer-summary-line"><span>Hardware</span><strong>${escapeHtml(device.hardware_model || "--")}</strong></div>
       <div class="developer-summary-line"><span>Perfil</span><strong>${escapeHtml(device.firmware_profile || device.device_id)}</strong></div>
-      <div class="developer-summary-line"><span>Ultimo contato</span><strong>${formatDateTime(device.last_seen_at)}</strong></div>
+      <div class="developer-summary-line"><span>&Uacute;ltimo contato</span><strong>${formatDateTime(device.last_seen_at)}</strong></div>
       <div class="developer-summary-line"><span>Firmware atual</span><strong>${escapeHtml(device.firmware_version || "--")}</strong></div>
-      <div class="developer-summary-line"><span>Horarios ativos</span><strong>${activeSchedules}</strong></div>
+      <div class="developer-summary-line"><span>Hor&aacute;rios ativos</span><strong>${activeSchedules}</strong></div>
       <div class="developer-summary-line"><span>Chave ativa</span><strong>${device.device_api_key_last4 ? `...${escapeHtml(device.device_api_key_last4)}` : "Sem chave"}</strong></div>
       <div class="developer-summary-line"><span>Chave em espera</span><strong>${device.pending_device_api_key_last4 ? `...${escapeHtml(device.pending_device_api_key_last4)}` : "Nenhuma"}</strong></div>
     </div>
@@ -729,7 +731,7 @@ function renderDeviceSummary(device) {
 
 function renderDeploymentHistory(deployments) {
   if (!Array.isArray(deployments) || !deployments.length) {
-    elements.deploymentHistory.innerHTML = '<div class="empty-state">Nenhum deployment para mostrar.</div>';
+    elements.deploymentHistory.innerHTML = '<div class="empty-state">Nenhum deploy para mostrar.</div>';
     return;
   }
 
@@ -770,7 +772,7 @@ function renderDeploymentHistory(deployments) {
         });
         await refreshOverview("Deploy cancelado.");
       } catch (error) {
-        handlePortalError(error, "Nao foi possivel cancelar o deploy.");
+        handlePortalError(error, "N\u00e3o foi poss\u00edvel cancelar o deploy.");
       }
     });
   }
@@ -835,7 +837,7 @@ async function submitBuildPlanForm(event) {
     state.buildPlan = null;
     elements.buildPlanUseButton.disabled = true;
     renderBuildPlan();
-    handlePortalError(error, "Nao foi possivel gerar o plano do firmware.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel gerar o plano do firmware.");
   }
 }
 
@@ -843,7 +845,7 @@ function renderBuildPlan() {
   if (!state.buildPlan) {
     elements.buildPlanCard.innerHTML = `
       <strong>Nenhum plano gerado</strong>
-      <p>Selecione um ESP e uma versao para montar o release_code, o nome do .bin e o comando sugerido.</p>
+      <p>Selecione um ESP e uma vers&atilde;o para montar o release_code, o nome do .bin e o comando sugerido.</p>
     `;
     return;
   }
@@ -863,12 +865,12 @@ function renderBuildPlan() {
     <strong>${escapeHtml(plan.release.release_code)}</strong>
     <div class="developer-summary-list">
       <div class="developer-summary-line"><span>ESP</span><strong>${escapeHtml(plan.target.device_id)}</strong></div>
-      <div class="developer-summary-line"><span>Binario</span><strong>${escapeHtml(plan.files.binary_filename)}</strong></div>
+      <div class="developer-summary-line"><span>Bin&aacute;rio</span><strong>${escapeHtml(plan.files.binary_filename)}</strong></div>
       <div class="developer-summary-line"><span>Firmware URL</span><strong>${escapeHtml(plan.files.firmware_url)}</strong></div>
       <div class="developer-summary-line"><span>Sketch</span><strong>${escapeHtml(plan.files.sketch_path)}</strong></div>
       <div class="developer-summary-line"><span>Chave esperada</span><strong>${escapeHtml(plan.target.expected_device_key_last4 ? `...${plan.target.expected_device_key_last4}` : "Sem final salvo")}</strong></div>
     </div>
-    ${hasCurrentKey ? `<p class="developer-card-copy developer-card-copy-spaced">${generatedKeyIsPending ? "A chave em espera deste ESP foi gerada nesta sessao. Use-a no firmware e a API promove automaticamente no primeiro contato." : "A chave ativa deste ESP foi gerada nesta sessao. Use-a no comando abaixo."}</p>` : ""}
+    ${hasCurrentKey ? `<p class="developer-card-copy developer-card-copy-spaced">${generatedKeyIsPending ? "A chave em espera deste ESP foi gerada nesta sess&atilde;o. Use-a no firmware e a API promove automaticamente no primeiro contato." : "A chave ativa deste ESP foi gerada nesta sess&atilde;o. Use-a no comando abaixo."}</p>` : ""}
     <div class="developer-meta-grid">${checklist}</div>
     <p class="developer-card-copy developer-card-copy-spaced">Comando sugerido</p>
     <pre class="developer-code-block">${escapeHtml(plan.build.powerShell_command)}</pre>
@@ -896,7 +898,7 @@ function applyBuildPlanToReleaseForm() {
   elements.releaseUrlInput.value = release.firmware_url || "";
   elements.releaseNotesInput.value = release.notes || "";
   updateReleaseTargetFields();
-  setBanner("Plano aplicado no formulario de release.", "success");
+  setBanner("Plano aplicado no formul\u00e1rio de release.", "success");
 }
 
 function updateReleaseTargetFields() {
@@ -940,7 +942,7 @@ async function submitReleaseForm(event) {
       elements.releaseSelect.value = String(state.selectedReleaseId);
     }
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel salvar a release.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel salvar a release.");
   }
 }
 
@@ -1044,7 +1046,7 @@ async function submitDeploymentForm(event) {
         : "Nenhum ESP elegivel para o deploy."
     );
   } catch (error) {
-    handlePortalError(error, "Nao foi possivel enviar a OTA.");
+    handlePortalError(error, "N\u00e3o foi poss\u00edvel enviar a OTA.");
   }
 }
 
@@ -1055,10 +1057,10 @@ function showUserProvisioningCard(password) {
 
 function hideUserProvisioningCard() {
   elements.userProvisioningCard.hidden = true;
-  elements.userProvisioningTitle.textContent = "Senha provisoria gerada";
+  elements.userProvisioningTitle.textContent = "Senha provis\u00f3ria gerada";
   elements.userProvisioningValue.textContent = "";
   elements.userProvisioningHint.textContent =
-    "Ela comeca com Haxis- e o usuario precisa trocar essa senha no primeiro login.";
+    "Ela come\u00e7a com Haxis- e o usu\u00e1rio precisa trocar essa senha no primeiro login.";
 }
 
 function syncUserProvisioningCard() {
@@ -1068,11 +1070,11 @@ function syncUserProvisioningCard() {
     state.userProvisioning.userId === state.selectedUserId
   ) {
     elements.userProvisioningTitle.textContent = state.userProvisioning.temporary
-      ? "Senha provisoria gerada"
+      ? "Senha provis\u00f3ria gerada"
       : "Senha definida";
     elements.userProvisioningHint.textContent = state.userProvisioning.temporary
-      ? "Ela comeca com Haxis- e o usuario precisa trocar essa senha no primeiro login."
-      : "Essa senha foi definida agora e ja pode ser usada no painel do cliente.";
+      ? "Ela come\u00e7a com Haxis- e o usu\u00e1rio precisa trocar essa senha no primeiro login."
+      : "Essa senha foi definida agora e j\u00e1 pode ser usada no painel do cliente.";
     showUserProvisioningCard(state.userProvisioning.password);
     return;
   }
@@ -1088,7 +1090,7 @@ function showDeviceProvisioningCard(deviceApiKey, options = {}) {
   elements.deviceProvisioningValue.textContent = deviceApiKey;
   elements.deviceProvisioningHint.textContent = options.staged
     ? "A chave atual continua funcionando. Grave esta nova chave no ESP e, no primeiro contato com ela, a API conclui a troca automaticamente."
-    : "Essa chave ja substituiu a anterior no cadastro. Grave-a no firmware antes de reconectar o ESP.";
+    : "Essa chave j\u00e1 substituiu a anterior no cadastro. Grave-a no firmware antes de reconectar o ESP.";
 }
 
 function hideDeviceProvisioningCard() {
@@ -1190,7 +1192,7 @@ function buildReleaseTargetLabel(release) {
   }
 
   if (release.target_type === "user") {
-    return `Usuario ${release.target_user_company_name || release.target_user_id || "--"}`;
+    return `Usu\u00e1rio ${release.target_user_company_name || release.target_user_id || "--"}`;
   }
 
   return "Todos os ESPs";
